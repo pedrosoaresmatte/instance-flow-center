@@ -27,6 +27,8 @@ interface WhatsAppConnection {
   phone?: string;
   createdAt: string;
   lastActivity?: string;
+  qrCode?: string;
+  qrCodeText?: string;
 }
 
 const Dashboard = () => {
@@ -91,12 +93,14 @@ const Dashboard = () => {
 
       const result = await response.json();
       
-      // Criar nova conexão localmente
+      // Criar nova conexão localmente usando os dados da resposta
       const newConnection: WhatsAppConnection = {
-        id: `conn_${Date.now()}`,
-        name: connectionName,
+        id: result.instanceId || `conn_${Date.now()}`,
+        name: result["Nome da instância"] || connectionName,
         status: "qr_code",
         createdAt: new Date().toISOString(),
+        qrCode: result.base64, // Adicionar o QR code base64
+        qrCodeText: result.code // Adicionar o código do QR
       };
       
       setConnections(prev => [...prev, newConnection]);
@@ -280,6 +284,7 @@ const Dashboard = () => {
         isOpen={showQRModal}
         onClose={() => setShowQRModal(false)}
         instanceId={selectedConnectionId}
+        connection={connections.find(conn => conn.id === selectedConnectionId)}
         onConnectionSuccess={(connectionId, phone) => {
           setConnections(prev =>
             prev.map(conn =>

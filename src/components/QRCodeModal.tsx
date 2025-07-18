@@ -5,14 +5,26 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RefreshCw, CheckCircle, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+interface WhatsAppConnection {
+  id: string;
+  name: string;
+  status: "connected" | "disconnected" | "qr_code" | "loading";
+  phone?: string;
+  createdAt: string;
+  lastActivity?: string;
+  qrCode?: string;
+  qrCodeText?: string;
+}
+
 interface QRCodeModalProps {
   isOpen: boolean;
   onClose: () => void;
   instanceId: string | null;
+  connection?: WhatsAppConnection;
   onConnectionSuccess: (instanceId: string, phone: string) => void;
 }
 
-const QRCodeModal = ({ isOpen, onClose, instanceId, onConnectionSuccess }: QRCodeModalProps) => {
+const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSuccess }: QRCodeModalProps) => {
   const [qrCode, setQrCode] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -22,9 +34,16 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, onConnectionSuccess }: QRCod
 
   useEffect(() => {
     if (isOpen && instanceId) {
-      generateQRCode();
+      // Se a conexão já tem QR code, usar ele
+      if (connection?.qrCode) {
+        setQrCode(connection.qrCode);
+        setIsLoading(false);
+        setCountdown(30);
+      } else {
+        generateQRCode();
+      }
     }
-  }, [isOpen, instanceId]);
+  }, [isOpen, instanceId, connection]);
 
   useEffect(() => {
     if (isOpen && !isConnected && countdown > 0) {
