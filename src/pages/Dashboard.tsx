@@ -165,8 +165,12 @@ const Dashboard = () => {
       <header className="border-b bg-card">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <div className="h-10 w-10 bg-secondary rounded-lg flex items-center justify-center">
-              <MessageSquare className="h-5 w-5 text-secondary-foreground" />
+            <div className="h-10 w-10 rounded-lg flex items-center justify-center">
+              <img 
+                src="/lovable-uploads/b2475506-2a2f-4c67-acd2-dc0db3beff0c.png" 
+                alt="Marte Logo" 
+                className="h-10 w-10 object-contain"
+              />
             </div>
             <div>
               <h1 className="text-xl font-bold">WhatsApp Manager</h1>
