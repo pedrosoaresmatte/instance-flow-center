@@ -45,9 +45,11 @@ const Login = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="h-12 w-12 bg-secondary rounded-lg flex items-center justify-center">
-              <MessageSquare className="h-6 w-6 text-secondary-foreground" />
-            </div>
+            <img 
+              src="/lovable-uploads/b2475506-2a2f-4c67-acd2-dc0db3beff0c.png" 
+              alt="Marte Logo" 
+              className="h-16 w-auto"
+            />
           </div>
           <CardTitle className="text-2xl font-bold">Entrar</CardTitle>
           <CardDescription>
