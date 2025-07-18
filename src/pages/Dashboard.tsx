@@ -18,8 +18,9 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import QRCodeModal from "@/components/QRCodeModal";
 import InstanceCard from "@/components/InstanceCard";
+import ConnectionNameModal from "@/components/ConnectionNameModal";
 
-interface WhatsAppInstance {
+interface WhatsAppConnection {
   id: string;
   name: string;
   status: "connected" | "disconnected" | "qr_code" | "loading";
@@ -29,25 +30,27 @@ interface WhatsAppInstance {
 }
 
 const Dashboard = () => {
-  const [instances, setInstances] = useState<WhatsAppInstance[]>([]);
+  const [connections, setConnections] = useState<WhatsAppConnection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showQRModal, setShowQRModal] = useState(false);
-  const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
+  const [showConnectionNameModal, setShowConnectionNameModal] = useState(false);
+  const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
+  const [isCreatingConnection, setIsCreatingConnection] = useState(false);
   const { toast } = useToast();
 
   // Simulação de dados - substituir pela integração real com Supabase
   useEffect(() => {
-    const loadInstances = async () => {
+    const loadConnections = async () => {
       setIsLoading(true);
       
       // Simulação de carregamento
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Dados de exemplo
-      const mockInstances: WhatsAppInstance[] = [
+      const mockConnections: WhatsAppConnection[] = [
         {
-          id: "inst_1",
-          name: "Instância Principal",
+          id: "conn_1",
+          name: "conexao-principal",
           status: "connected",
           phone: "+55 11 99999-9999",
           createdAt: "2024-01-15T10:30:00Z",
@@ -55,59 +58,87 @@ const Dashboard = () => {
         }
       ];
       
-      setInstances(mockInstances);
+      setConnections(mockConnections);
       setIsLoading(false);
     };
 
-    loadInstances();
+    loadConnections();
   }, []);
 
-  const handleCreateInstance = async () => {
+  const handleCreateConnection = () => {
+    setShowConnectionNameModal(true);
+  };
+
+  const handleConnectionNameSubmit = async (connectionName: string) => {
+    setIsCreatingConnection(true);
+    
     try {
-      // TODO: Integrar com n8n webhook para criar instância
-      const newInstance: WhatsAppInstance = {
-        id: `inst_${Date.now()}`,
-        name: `Instância ${instances.length + 1}`,
+      // Enviar para o webhook
+      const response = await fetch('https://webhook.abbadigital.com.br/webhook/cria-instancia-matte', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          connectionName: connectionName,
+          timestamp: new Date().toISOString()
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Falha na comunicação com o servidor');
+      }
+
+      const result = await response.json();
+      
+      // Criar nova conexão localmente
+      const newConnection: WhatsAppConnection = {
+        id: `conn_${Date.now()}`,
+        name: connectionName,
         status: "qr_code",
         createdAt: new Date().toISOString(),
       };
       
-      setInstances(prev => [...prev, newInstance]);
-      setSelectedInstanceId(newInstance.id);
+      setConnections(prev => [...prev, newConnection]);
+      setSelectedConnectionId(newConnection.id);
+      setShowConnectionNameModal(false);
       setShowQRModal(true);
       
       toast({
-        title: "Instância criada!",
+        title: "Conexão criada!",
         description: "Escaneie o QR Code para conectar.",
       });
     } catch (error) {
+      console.error('Erro ao criar conexão:', error);
       toast({
         title: "Erro",
-        description: "Falha ao criar instância. Tente novamente.",
+        description: "Falha ao criar conexão. Tente novamente.",
         variant: "destructive",
       });
+    } finally {
+      setIsCreatingConnection(false);
     }
   };
 
-  const handleConnectInstance = (instanceId: string) => {
-    setSelectedInstanceId(instanceId);
+  const handleConnectConnection = (connectionId: string) => {
+    setSelectedConnectionId(connectionId);
     setShowQRModal(true);
   };
 
-  const handleDisconnectInstance = async (instanceId: string) => {
+  const handleDisconnectConnection = async (connectionId: string) => {
     try {
       // TODO: Integrar com n8n webhook para desconectar
-      setInstances(prev =>
-        prev.map(inst =>
-          inst.id === instanceId
-            ? { ...inst, status: "disconnected" as const, phone: undefined }
-            : inst
+      setConnections(prev =>
+        prev.map(conn =>
+          conn.id === connectionId
+            ? { ...conn, status: "disconnected" as const, phone: undefined }
+            : conn
         )
       );
       
       toast({
         title: "Desconectado",
-        description: "Instância desconectada com sucesso.",
+        description: "Conexão desconectada com sucesso.",
       });
     } catch (error) {
       toast({
@@ -118,14 +149,14 @@ const Dashboard = () => {
     }
   };
 
-  const handleDeleteInstance = async (instanceId: string) => {
+  const handleDeleteConnection = async (connectionId: string) => {
     try {
       // TODO: Integrar com n8n webhook para excluir
-      setInstances(prev => prev.filter(inst => inst.id !== instanceId));
+      setConnections(prev => prev.filter(conn => conn.id !== connectionId));
       
       toast({
         title: "Excluído",
-        description: "Instância removida com sucesso.",
+        description: "Conexão removida com sucesso.",
       });
     } catch (error) {
       toast({
@@ -151,7 +182,7 @@ const Dashboard = () => {
           <div className="flex justify-center items-center min-h-[400px]">
             <div className="text-center">
               <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Carregando suas instâncias...</p>
+              <p className="text-muted-foreground">Carregando suas conexões...</p>
             </div>
           </div>
         </div>
@@ -195,58 +226,66 @@ const Dashboard = () => {
       <main className="max-w-6xl mx-auto p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold">Suas Instâncias</h2>
+            <h2 className="text-2xl font-bold">Suas Conexões</h2>
             <p className="text-muted-foreground">
               Gerencie suas conexões com o WhatsApp
             </p>
           </div>
           
-          <Button onClick={handleCreateInstance} className="flex items-center space-x-2">
+          <Button onClick={handleCreateConnection} className="flex items-center space-x-2">
             <Plus className="h-4 w-4" />
-            <span>Nova Instância</span>
+            <span>Nova Conexão</span>
           </Button>
         </div>
 
-        {instances.length === 0 ? (
+        {connections.length === 0 ? (
           <Card className="text-center py-12">
             <CardContent>
               <Smartphone className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-              <CardTitle className="mb-2">Nenhuma instância criada</CardTitle>
+              <CardTitle className="mb-2">Nenhuma conexão criada</CardTitle>
               <CardDescription className="mb-6">
-                Crie sua primeira instância para começar a usar o WhatsApp
+                Crie sua primeira conexão para começar a usar o WhatsApp
               </CardDescription>
-              <Button onClick={handleCreateInstance}>
+              <Button onClick={handleCreateConnection}>
                 <Plus className="h-4 w-4 mr-2" />
-                Criar Primeira Instância
+                Criar Primeira Conexão
               </Button>
             </CardContent>
           </Card>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {instances.map((instance) => (
+            {connections.map((connection) => (
               <InstanceCard
-                key={instance.id}
-                instance={instance}
-                onConnect={() => handleConnectInstance(instance.id)}
-                onDisconnect={() => handleDisconnectInstance(instance.id)}
-                onDelete={() => handleDeleteInstance(instance.id)}
+                key={connection.id}
+                instance={connection}
+                onConnect={() => handleConnectConnection(connection.id)}
+                onDisconnect={() => handleDisconnectConnection(connection.id)}
+                onDelete={() => handleDeleteConnection(connection.id)}
               />
             ))}
           </div>
         )}
       </main>
 
+      {/* Connection Name Modal */}
+      <ConnectionNameModal
+        isOpen={showConnectionNameModal}
+        onClose={() => setShowConnectionNameModal(false)}
+        onSubmit={handleConnectionNameSubmit}
+        isLoading={isCreatingConnection}
+      />
+
       {/* QR Code Modal */}
       <QRCodeModal
         isOpen={showQRModal}
         onClose={() => setShowQRModal(false)}
-        instanceId={selectedInstanceId}
-        onConnectionSuccess={(instanceId, phone) => {
-          setInstances(prev =>
-            prev.map(inst =>
-              inst.id === instanceId
-                ? { ...inst, status: "connected" as const, phone }
-                : inst
+        instanceId={selectedConnectionId}
+        onConnectionSuccess={(connectionId, phone) => {
+          setConnections(prev =>
+            prev.map(conn =>
+              conn.id === connectionId
+                ? { ...conn, status: "connected" as const, phone }
+                : conn
             )
           );
           setShowQRModal(false);
