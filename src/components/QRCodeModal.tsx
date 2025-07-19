@@ -64,22 +64,23 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
 
   // Polling para verificar se a conexão foi estabelecida (a cada 3 segundos)
   useEffect(() => {
-    if (isOpen && instanceId && qrCode && !isConnected && !isExpired && countdown > 0) {
+    if (isOpen && instanceId && qrCode && !isConnected && !isExpired && countdown > 0 && connection?.name) {
       setIsPolling(true);
       
       const checkConnection = async () => {
         try {
-          console.log(`Verificando conexão para instância: ${instanceId}`);
+          console.log(`Verificando conexão para instância: ${connection.name}`);
           
-          const response = await fetch(`https://webhook.abbadigital.com.br/webhook/pega-dados-da-conexao-matte`);
+          // Incluir o nome da instância como parâmetro na requisição
+          const response = await fetch(`https://webhook.abbadigital.com.br/webhook/pega-dados-da-conexao-matte?instanceName=${encodeURIComponent(connection.name)}`);
           
           if (response.ok) {
             const data = await response.json();
             console.log('Resposta da verificação:', data);
             
-            // Verificar se retornou os dados válidos do perfil conectado
-            if (data.profilename && data.contato && data.fotodoperfil) {
-              console.log('Conexão estabelecida com sucesso!');
+            // Validação mais rigorosa - verificar se retornou os dados válidos do perfil conectado
+            if (data && data.profilename && data.contato && data.fotodoperfil) {
+              console.log(`Conexão estabelecida com sucesso para a instância: ${connection.name}!`);
               
               // Parar o polling imediatamente
               setIsPolling(false);
@@ -123,12 +124,16 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
               setTimeout(() => {
                 handleCancel();
               }, 2000);
+            } else {
+              console.log(`Instância ${connection.name} ainda não conectada - dados incompletos ou vazios`);
             }
+          } else if (response.status === 404) {
+            console.log(`Instância ${connection.name} não encontrada ou não conectada`);
           } else {
-            console.log('Ancora não conectado, status:', response.status);
+            console.log(`Erro na verificação da instância ${connection.name}, status:`, response.status);
           }
         } catch (error) {
-          console.log("Verificando conexão...", error);
+          console.log(`Erro ao verificar conexão para ${connection.name}:`, error);
         }
       };
 
@@ -143,7 +148,7 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
     } else {
       setIsPolling(false);
     }
-  }, [isOpen, instanceId, qrCode, isConnected, isExpired, countdown, onConnectionSuccess, toast]);
+  }, [isOpen, instanceId, qrCode, isConnected, isExpired, countdown, connection?.name, onConnectionSuccess, toast]);
 
   const generateQRCode = async () => {
     if (!instanceId) return;
@@ -281,7 +286,7 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
                         <div className="mt-3 flex items-center justify-center space-x-2">
                           <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                           <p className="text-xs text-blue-600">
-                            Aguardando escaneamento... Verificando a cada 3 segundos.
+                            Aguardando escaneamento... Verificando conexão para "{connection?.name}" a cada 3 segundos.
                           </p>
                         </div>
                       )}
