@@ -80,8 +80,8 @@ const Dashboard = () => {
       setIsLoading(true);
       
       try {
-        const { data: agents, error } = await supabase
-          .from('agents')
+        const { data: conexoes, error } = await supabase
+          .from('conexoes')
           .select('*')
           .eq('type', 'whatsapp')
           .eq('user_id', user.id)
@@ -98,14 +98,14 @@ const Dashboard = () => {
         }
 
         // Mapear dados do banco para a interface
-        const mappedConnections: WhatsAppConnection[] = agents?.map(agent => ({
-          id: agent.id,
-          name: agent.name,
-          status: agent.status === 'active' ? 'connected' : 
-                 agent.status === 'connecting' ? 'qr_code' : 'disconnected',
-          phone: agent.whatsapp_contact,
-          createdAt: agent.created_at,
-          lastActivity: agent.whatsapp_connected_at,
+        const mappedConnections: WhatsAppConnection[] = conexoes?.map(conexao => ({
+          id: conexao.id,
+          name: conexao.name,
+          status: conexao.status === 'active' ? 'connected' : 
+                 conexao.status === 'connecting' ? 'qr_code' : 'disconnected',
+          phone: conexao.whatsapp_contact,
+          createdAt: conexao.created_at,
+          lastActivity: conexao.whatsapp_connected_at,
         })) || [];
         
         setConnections(mappedConnections);
@@ -150,8 +150,8 @@ const Dashboard = () => {
         throw new Error('Usuário não autenticado');
       }
 
-      const { data: agent, error } = await supabase
-        .from('agents')
+      const { data: conexao, error } = await supabase
+        .from('conexoes')
         .insert({
           user_id: user.id,
           name: result["Nome da instância"] || connectionName,
@@ -176,16 +176,16 @@ const Dashboard = () => {
       
       // Criar nova conexão localmente usando os dados salvos
       const newConnection: WhatsAppConnection = {
-        id: agent.id,
-        name: agent.name,
+        id: conexao.id,
+        name: conexao.name,
         status: "qr_code",
-        createdAt: agent.created_at,
+        createdAt: conexao.created_at,
         qrCode: result.base64,
         qrCodeText: result.code
       };
       
       setConnections(prev => [...prev, newConnection]);
-      setSelectedConnectionId(agent.id);
+      setSelectedConnectionId(conexao.id);
       setShowConnectionNameModal(false);
       setShowQRModal(true);
       
@@ -214,7 +214,7 @@ const Dashboard = () => {
     try {
       // Atualizar no banco de dados
       const { error } = await supabase
-        .from('agents')
+        .from('conexoes')
         .update({
           status: 'disconnected',
           whatsapp_contact: null,
@@ -260,7 +260,7 @@ const Dashboard = () => {
     try {
       // Excluir do banco de dados
       const { error } = await supabase
-        .from('agents')
+        .from('conexoes')
         .delete()
         .eq('id', connectionId);
 
@@ -419,7 +419,7 @@ const Dashboard = () => {
           try {
             // Atualizar no banco de dados
             const { error } = await supabase
-              .from('agents')
+              .from('conexoes')
               .update({
                 status: 'active',
                 whatsapp_contact: phone,

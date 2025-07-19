@@ -14,7 +14,7 @@ export type Database = {
   }
   public: {
     Tables: {
-      agents: {
+      conexoes: {
         Row: {
           channel: Database["public"]["Enums"]["agent_channel"] | null
           configuration: Json | null
