@@ -218,10 +218,30 @@ const Dashboard = () => {
         throw new Error('Conexão não encontrada');
       }
 
-      // Enviar requisição GET para o webhook de conexão
-      await fetch(`https://webhook.abbadigital.com.br/webhook/conecta-matte?instanceName=${encodeURIComponent(connection.name)}`, {
+      // Enviar requisição GET para o webhook de conexão e capturar resposta JSON
+      const response = await fetch(`https://webhook.abbadigital.com.br/webhook/conecta-matte?instanceName=${encodeURIComponent(connection.name)}`, {
         method: 'GET',
       });
+
+      if (!response.ok) {
+        throw new Error(`Erro na requisição: ${response.status}`);
+      }
+
+      const qrData = await response.json();
+      console.log('Dados do QR Code recebidos:', qrData);
+
+      // Atualizar a conexão local com os dados do QR code
+      const updatedConnections = connections.map(conn => 
+        conn.id === connectionId 
+          ? { 
+              ...conn, 
+              qrCode: qrData.base64 ? (qrData.base64.startsWith('data:image') ? qrData.base64 : `data:image/png;base64,${qrData.base64}`) : undefined,
+              qrCodeText: qrData.qrCodeText,
+              status: 'qr_code' as const
+            }
+          : conn
+      );
+      setConnections(updatedConnections);
 
       setSelectedConnectionId(connectionId);
       setShowQRModal(true);
