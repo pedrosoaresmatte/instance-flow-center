@@ -39,10 +39,33 @@ const Dashboard = () => {
   const [showConnectionNameModal, setShowConnectionNameModal] = useState(false);
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
   const [isCreatingConnection, setIsCreatingConnection] = useState(false);
+  const [user, setUser] = useState<any>(null);
   const { toast } = useToast();
 
-  // Carregar conexões do Supabase
+  // Verificar autenticação e carregar conexões do Supabase
   useEffect(() => {
+    const initializeUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        // Para desenvolvimento, criar um usuário temporário
+        const { data, error } = await supabase.auth.signInAnonymously();
+        if (error) {
+          console.error('Erro ao criar sessão anônima:', error);
+          return;
+        }
+        setUser(data.user);
+      } else {
+        setUser(session.user);
+      }
+    };
+
+    initializeUser();
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
     const loadConnections = async () => {
       setIsLoading(true);
       
@@ -83,7 +106,7 @@ const Dashboard = () => {
     };
 
     loadConnections();
-  }, [toast]);
+  }, [user, toast]);
 
   const handleCreateConnection = () => {
     setShowConnectionNameModal(true);
@@ -112,8 +135,6 @@ const Dashboard = () => {
       const result = await response.json();
       
       // Salvar no banco de dados
-      const { data: { user } } = await supabase.auth.getUser();
-      
       if (!user) {
         throw new Error('Usuário não autenticado');
       }
