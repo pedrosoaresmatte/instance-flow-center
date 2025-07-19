@@ -210,9 +210,29 @@ const Dashboard = () => {
     }
   };
 
-  const handleConnectConnection = (connectionId: string) => {
-    setSelectedConnectionId(connectionId);
-    setShowQRModal(true);
+  const handleConnectConnection = async (connectionId: string) => {
+    try {
+      // Encontrar a conexão para obter o nome da instância
+      const connection = connections.find(conn => conn.id === connectionId);
+      if (!connection) {
+        throw new Error('Conexão não encontrada');
+      }
+
+      // Enviar requisição GET para o webhook de conexão
+      await fetch(`https://webhook.abbadigital.com.br/webhook/conecta-matte?instanceName=${encodeURIComponent(connection.name)}`, {
+        method: 'GET',
+      });
+
+      setSelectedConnectionId(connectionId);
+      setShowQRModal(true);
+    } catch (error) {
+      console.error('Erro ao conectar instância:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao iniciar conexão da instância",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDisconnectConnection = async (connectionId: string) => {
