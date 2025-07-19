@@ -217,6 +217,23 @@ const Dashboard = () => {
 
   const handleDisconnectConnection = async (connectionId: string) => {
     try {
+      // Encontrar a conexão para obter o nome da instância
+      const connection = connections.find(conn => conn.id === connectionId);
+      if (!connection) {
+        throw new Error('Conexão não encontrada');
+      }
+
+      // Enviar requisição para o webhook de desconexão
+      await fetch('https://webhook.abbadigital.com.br/webhook/desconecta-matte', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          instanceName: connection.name
+        }),
+      });
+
       // Atualizar no banco de dados
       const { error } = await supabase
         .from('conexoes')
