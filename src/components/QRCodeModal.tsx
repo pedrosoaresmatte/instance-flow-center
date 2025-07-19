@@ -79,6 +79,11 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
                 title: "Conectado!",
                 description: `WhatsApp conectado com sucesso para ${data.profilename}`,
               });
+              
+              // Fechar o modal automaticamente após 2 segundos
+              setTimeout(() => {
+                handleCancel();
+              }, 2000);
             }
           } else {
             console.log('Ainda não conectado, status:', response.status);
@@ -121,14 +126,15 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
   };
 
   const handleClose = () => {
-    // Só permitir fechar se conectado ou se explicitamente cancelado
-    if (isConnected || !qrCode) {
+    // Só permitir fechar se conectado, sem QR code, ou se for cancelamento manual
+    if (isConnected) {
       setQrCode("");
       setIsConnected(false);
       setError("");
       setCountdown(60);
       onClose();
     }
+    // Se não conectado e tem QR code, não fecha (usuário deve usar cancelar)
   };
 
   const handleCancel = () => {
@@ -141,7 +147,7 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={() => {}}>  {/* Prevenir fechamento automático */}
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
