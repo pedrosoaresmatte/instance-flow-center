@@ -37,20 +37,11 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
 
   useEffect(() => {
     if (isOpen && instanceId) {
-      // Se a conexão já tem QR code, usar ele
-      if (connection?.qrCode) {
-        console.log('Usando QR code da conexão:', connection.qrCode);
-        setQrCode(connection.qrCode);
-        setIsLoading(false);
-        setCountdown(60);
-        setIsExpired(false);
-        setError("");
-      } else {
-        console.log('Conexão sem QR code, gerando novo...');
-        generateQRCode();
-      }
+      // Sempre gerar um novo QR code quando abrir o modal (reconexão)
+      console.log('Modal aberto, gerando novo QR code para reconexão...');
+      generateQRCode();
     }
-  }, [isOpen, instanceId, connection?.qrCode]); // Adicionado connection?.qrCode como dependência
+  }, [isOpen, instanceId]);
 
   // Contador regressivo
   useEffect(() => {
@@ -154,7 +145,7 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
   }, [isOpen, instanceId, qrCode, isConnected, isExpired, countdown, connection?.name, onConnectionSuccess, toast]);
 
   const generateQRCode = async () => {
-    if (!instanceId) return;
+    if (!instanceId || !connection?.name) return;
     
     setIsLoading(true);
     setError("");
@@ -163,43 +154,19 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
     setIsConnected(false);
     
     try {
-      console.log("Gerando QR Code para instância:", instanceId);
+      console.log("Gerando QR Code para reconexão da instância:", connection.name);
       
-      // Fazer requisição POST para obter QR Code real
-      const response = await fetch('https://webhook.abbadigital.com.br/webhook/cria-instancia-matte', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          connectionName: connection?.name || instanceId,
-          timestamp: new Date().toISOString()
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Erro na requisição: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('Resposta da criação da instância:', data);
-      
-      // Usar o base64 retornado pela API
-      if (data.base64) {
-        // Se o base64 não tiver o prefixo data:image, adicionar
-        const qrCodeData = data.base64.startsWith('data:image') 
-          ? data.base64 
-          : `data:image/png;base64,${data.base64}`;
-        
-        setQrCode(qrCodeData);
-        console.log('QR Code gerado com sucesso');
+      // Usar a resposta da requisição GET que já vem com o QR code
+      if (connection.qrCode) {
+        console.log('Usando QR code da requisição GET:', connection.qrCode);
+        setQrCode(connection.qrCode);
       } else {
-        throw new Error('Base64 do QR Code não encontrado na resposta');
+        throw new Error('QR Code não encontrado na conexão');
       }
       
     } catch (error) {
-      console.error('Erro ao gerar QR Code:', error);
-      setError("Falha ao gerar QR Code. Tente novamente.");
+      console.error('Erro ao obter QR Code:', error);
+      setError("Falha ao obter QR Code. Tente novamente.");
     } finally {
       setIsLoading(false);
     }
