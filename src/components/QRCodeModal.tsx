@@ -157,12 +157,37 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
     try {
       console.log("Gerando QR Code para instância:", instanceId);
       
-      // TODO: Integrar com n8n webhook para obter QR Code
-      // Por enquanto, simular QR Code
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Fazer requisição POST para obter QR Code real
+      const response = await fetch('https://webhook.abbadigital.com.br/webhook/cria-instancia-matte', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          connectionName: connection?.name || instanceId,
+          timestamp: new Date().toISOString()
+        })
+      });
       
-      const mockQRCode = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
-      setQrCode(mockQRCode);
+      if (!response.ok) {
+        throw new Error(`Erro na requisição: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Resposta da criação da instância:', data);
+      
+      // Usar o base64 retornado pela API
+      if (data.base64) {
+        // Se o base64 não tiver o prefixo data:image, adicionar
+        const qrCodeData = data.base64.startsWith('data:image') 
+          ? data.base64 
+          : `data:image/png;base64,${data.base64}`;
+        
+        setQrCode(qrCodeData);
+        console.log('QR Code gerado com sucesso');
+      } else {
+        throw new Error('Base64 do QR Code não encontrado na resposta');
+      }
       
     } catch (error) {
       console.error('Erro ao gerar QR Code:', error);
