@@ -39,15 +39,18 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
     if (isOpen && instanceId) {
       // Se a conexão já tem QR code, usar ele
       if (connection?.qrCode) {
+        console.log('Usando QR code da conexão:', connection.qrCode);
         setQrCode(connection.qrCode);
         setIsLoading(false);
         setCountdown(60);
         setIsExpired(false);
+        setError("");
       } else {
+        console.log('Conexão sem QR code, gerando novo...');
         generateQRCode();
       }
     }
-  }, [isOpen, instanceId, connection]);
+  }, [isOpen, instanceId, connection?.qrCode]); // Adicionado connection?.qrCode como dependência
 
   // Contador regressivo
   useEffect(() => {
