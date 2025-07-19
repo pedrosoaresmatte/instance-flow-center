@@ -323,6 +323,28 @@ const Dashboard = () => {
 
   const handleDeleteConnection = async (connectionId: string) => {
     try {
+      // Encontrar a conexão para obter o nome da instância
+      const connection = connections.find(conn => conn.id === connectionId);
+      if (!connection) {
+        throw new Error('Conexão não encontrada');
+      }
+
+      // Enviar requisição POST para o webhook de exclusão
+      const response = await fetch('https://webhook.abbadigital.com.br/webhook/exclui-instancia-matte', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          instanceName: connection.name
+        }),
+      });
+
+      if (!response.ok) {
+        console.warn(`Erro na requisição de exclusão do webhook: ${response.status}`);
+        // Continua com a exclusão mesmo se o webhook falhar
+      }
+
       // Excluir do banco de dados
       const { error } = await supabase
         .from('conexoes')
