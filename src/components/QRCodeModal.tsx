@@ -154,19 +154,29 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
     setIsConnected(false);
     
     try {
-      console.log("Gerando QR Code para reconexão da instância:", connection.name);
+      console.log("Fazendo nova requisição GET para obter QR Code atualizado da instância:", connection.name);
       
-      // Usar a resposta da requisição GET que já vem com o QR code
-      if (connection.qrCode) {
-        console.log('Usando QR code da requisição GET:', connection.qrCode);
-        setQrCode(connection.qrCode);
+      // Fazer nova requisição GET para obter QR code atualizado
+      const response = await fetch(`https://webhook.abbadigital.com.br/webhook/conecta-matte?connectionName=${encodeURIComponent(connection.name)}`);
+      
+      if (!response.ok) {
+        throw new Error(`Erro na requisição: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Nova resposta da requisição GET:', data);
+      
+      // Usar o QR code da resposta
+      if (data.qrCode) {
+        console.log('QR Code atualizado obtido com sucesso');
+        setQrCode(data.qrCode);
       } else {
-        throw new Error('QR Code não encontrado na conexão');
+        throw new Error('QR Code não encontrado na resposta');
       }
       
     } catch (error) {
-      console.error('Erro ao obter QR Code:', error);
-      setError("Falha ao obter QR Code. Tente novamente.");
+      console.error('Erro ao obter QR Code atualizado:', error);
+      setError("Falha ao obter QR Code atualizado. Tente novamente.");
     } finally {
       setIsLoading(false);
     }
