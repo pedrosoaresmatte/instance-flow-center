@@ -14,7 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      agents: {
+        Row: {
+          channel: Database["public"]["Enums"]["agent_channel"] | null
+          configuration: Json | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          status: Database["public"]["Enums"]["agent_status"]
+          type: Database["public"]["Enums"]["agent_type"]
+          updated_at: string
+          user_id: string
+          whatsapp_connected_at: string | null
+          whatsapp_contact: string | null
+          whatsapp_profile_name: string | null
+          whatsapp_profile_picture_data: string | null
+          whatsapp_profile_picture_url: string | null
+        }
+        Insert: {
+          channel?: Database["public"]["Enums"]["agent_channel"] | null
+          configuration?: Json | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          status?: Database["public"]["Enums"]["agent_status"]
+          type: Database["public"]["Enums"]["agent_type"]
+          updated_at?: string
+          user_id: string
+          whatsapp_connected_at?: string | null
+          whatsapp_contact?: string | null
+          whatsapp_profile_name?: string | null
+          whatsapp_profile_picture_data?: string | null
+          whatsapp_profile_picture_url?: string | null
+        }
+        Update: {
+          channel?: Database["public"]["Enums"]["agent_channel"] | null
+          configuration?: Json | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          status?: Database["public"]["Enums"]["agent_status"]
+          type?: Database["public"]["Enums"]["agent_type"]
+          updated_at?: string
+          user_id?: string
+          whatsapp_connected_at?: string | null
+          whatsapp_contact?: string | null
+          whatsapp_profile_name?: string | null
+          whatsapp_profile_picture_data?: string | null
+          whatsapp_profile_picture_url?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +76,19 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      agent_channel:
+        | "whatsapp"
+        | "telegram"
+        | "instagram"
+        | "facebook"
+        | "email"
+      agent_status:
+        | "active"
+        | "inactive"
+        | "connecting"
+        | "disconnected"
+        | "error"
+      agent_type: "whatsapp" | "telegram" | "instagram"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +215,16 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      agent_channel: ["whatsapp", "telegram", "instagram", "facebook", "email"],
+      agent_status: [
+        "active",
+        "inactive",
+        "connecting",
+        "disconnected",
+        "error",
+      ],
+      agent_type: ["whatsapp", "telegram", "instagram"],
+    },
   },
 } as const
