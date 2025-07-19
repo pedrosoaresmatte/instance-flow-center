@@ -21,7 +21,7 @@ interface QRCodeModalProps {
   onClose: () => void;
   instanceId: string | null;
   connection?: WhatsAppConnection;
-  onConnectionSuccess: (instanceId: string, phone: string) => void;
+  onConnectionSuccess: (instanceId: string, phone: string, profileData?: any) => void;
 }
 
 const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSuccess }: QRCodeModalProps) => {
@@ -67,7 +67,7 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
             // Se retornou dados válidos, significa que a conexão foi estabelecida
             if (data.profilename && data.contato) {
               setIsConnected(true);
-              onConnectionSuccess(instanceId, data.contato);
+              onConnectionSuccess(instanceId, data.contato, data);
               toast({
                 title: "Conectado!",
                 description: `WhatsApp conectado com sucesso para ${data.profilename}`,
@@ -107,7 +107,11 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
       setTimeout(() => {
         if (!isConnected) {
           setIsConnected(true);
-          onConnectionSuccess(instanceId, "+55 11 99999-8888");
+          onConnectionSuccess(instanceId, "+55 11 99999-8888", {
+            profilename: "Usuário Teste",
+            contato: "+5511999998888",
+            fotodoperfil: ""
+          });
           toast({
             title: "Conectado!",
             description: "WhatsApp conectado com sucesso.",

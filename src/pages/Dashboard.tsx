@@ -16,6 +16,7 @@ import {
   WifiOff
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import QRCodeModal from "@/components/QRCodeModal";
 import InstanceCard from "@/components/InstanceCard";
 import ConnectionNameModal from "@/components/ConnectionNameModal";
@@ -40,32 +41,49 @@ const Dashboard = () => {
   const [isCreatingConnection, setIsCreatingConnection] = useState(false);
   const { toast } = useToast();
 
-  // Simulação de dados - substituir pela integração real com Supabase
+  // Carregar conexões do Supabase
   useEffect(() => {
     const loadConnections = async () => {
       setIsLoading(true);
       
-      // Simulação de carregamento
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Dados de exemplo
-      const mockConnections: WhatsAppConnection[] = [
-        {
-          id: "conn_1",
-          name: "conexao-principal",
-          status: "connected",
-          phone: "+55 11 99999-9999",
-          createdAt: "2024-01-15T10:30:00Z",
-          lastActivity: "2024-01-18T14:25:00Z"
+      try {
+        const { data: agents, error } = await supabase
+          .from('agents')
+          .select('*')
+          .eq('type', 'whatsapp')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Erro ao carregar conexões:', error);
+          toast({
+            title: "Erro",
+            description: "Falha ao carregar conexões.",
+            variant: "destructive",
+          });
+          return;
         }
-      ];
-      
-      setConnections(mockConnections);
-      setIsLoading(false);
+
+        // Mapear dados do banco para a interface
+        const mappedConnections: WhatsAppConnection[] = agents?.map(agent => ({
+          id: agent.id,
+          name: agent.name,
+          status: agent.status === 'active' ? 'connected' : 
+                 agent.status === 'connecting' ? 'qr_code' : 'disconnected',
+          phone: agent.whatsapp_contact,
+          createdAt: agent.created_at,
+          lastActivity: agent.whatsapp_connected_at,
+        })) || [];
+        
+        setConnections(mappedConnections);
+      } catch (error) {
+        console.error('Erro inesperado:', error);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     loadConnections();
-  }, []);
+  }, [toast]);
 
   const handleCreateConnection = () => {
     setShowConnectionNameModal(true);
@@ -93,18 +111,49 @@ const Dashboard = () => {
 
       const result = await response.json();
       
-      // Criar nova conexão localmente usando os dados da resposta
+      // Salvar no banco de dados
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('Usuário não autenticado');
+      }
+
+      const { data: agent, error } = await supabase
+        .from('agents')
+        .insert({
+          user_id: user.id,
+          name: result["Nome da instância"] || connectionName,
+          type: 'whatsapp',
+          channel: 'whatsapp',
+          status: 'connecting',
+          configuration: {
+            connection_status: "connecting",
+            evolution_api_key: null,
+            evolution_instance_name: result.instanceId,
+            qr_code: result.base64,
+            qr_code_text: result.code
+          }
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Erro ao salvar no banco:', error);
+        throw new Error('Falha ao salvar conexão no banco de dados');
+      }
+      
+      // Criar nova conexão localmente usando os dados salvos
       const newConnection: WhatsAppConnection = {
-        id: result.instanceId || `conn_${Date.now()}`,
-        name: result["Nome da instância"] || connectionName,
+        id: agent.id,
+        name: agent.name,
         status: "qr_code",
-        createdAt: new Date().toISOString(),
-        qrCode: result.base64, // Adicionar o QR code base64
-        qrCodeText: result.code // Adicionar o código do QR
+        createdAt: agent.created_at,
+        qrCode: result.base64,
+        qrCodeText: result.code
       };
       
       setConnections(prev => [...prev, newConnection]);
-      setSelectedConnectionId(newConnection.id);
+      setSelectedConnectionId(agent.id);
       setShowConnectionNameModal(false);
       setShowQRModal(true);
       
@@ -285,15 +334,41 @@ const Dashboard = () => {
         onClose={() => setShowQRModal(false)}
         instanceId={selectedConnectionId}
         connection={connections.find(conn => conn.id === selectedConnectionId)}
-        onConnectionSuccess={(connectionId, phone) => {
-          setConnections(prev =>
-            prev.map(conn =>
-              conn.id === connectionId
-                ? { ...conn, status: "connected" as const, phone }
-                : conn
-            )
-          );
-          setShowQRModal(false);
+        onConnectionSuccess={async (connectionId, phone, profileData) => {
+          try {
+            // Atualizar no banco de dados
+            const { error } = await supabase
+              .from('agents')
+              .update({
+                status: 'active',
+                whatsapp_contact: phone,
+                whatsapp_profile_name: profileData?.profilename,
+                whatsapp_profile_picture_url: profileData?.fotodoperfil,
+                whatsapp_connected_at: new Date().toISOString(),
+                configuration: {
+                  connection_status: "connected",
+                  evolution_api_key: null,
+                  evolution_instance_name: connectionId
+                }
+              })
+              .eq('id', connectionId);
+
+            if (error) {
+              console.error('Erro ao atualizar conexão:', error);
+            }
+
+            // Atualizar estado local
+            setConnections(prev =>
+              prev.map(conn =>
+                conn.id === connectionId
+                  ? { ...conn, status: "connected" as const, phone }
+                  : conn
+              )
+            );
+            setShowQRModal(false);
+          } catch (error) {
+            console.error('Erro ao processar conexão:', error);
+          }
         }}
       />
     </div>
