@@ -212,7 +212,28 @@ const Dashboard = () => {
 
   const handleDisconnectConnection = async (connectionId: string) => {
     try {
-      // TODO: Integrar com n8n webhook para desconectar
+      // Atualizar no banco de dados
+      const { error } = await supabase
+        .from('agents')
+        .update({
+          status: 'disconnected',
+          whatsapp_contact: null,
+          whatsapp_profile_name: null,
+          whatsapp_profile_picture_url: null,
+          whatsapp_connected_at: null,
+          configuration: {
+            connection_status: "disconnected",
+            evolution_api_key: null,
+            evolution_instance_name: null
+          }
+        })
+        .eq('id', connectionId);
+
+      if (error) {
+        throw error;
+      }
+
+      // Atualizar estado local
       setConnections(prev =>
         prev.map(conn =>
           conn.id === connectionId
@@ -226,6 +247,7 @@ const Dashboard = () => {
         description: "Conexão desconectada com sucesso.",
       });
     } catch (error) {
+      console.error('Erro ao desconectar:', error);
       toast({
         title: "Erro",
         description: "Falha ao desconectar. Tente novamente.",
@@ -236,7 +258,17 @@ const Dashboard = () => {
 
   const handleDeleteConnection = async (connectionId: string) => {
     try {
-      // TODO: Integrar com n8n webhook para excluir
+      // Excluir do banco de dados
+      const { error } = await supabase
+        .from('agents')
+        .delete()
+        .eq('id', connectionId);
+
+      if (error) {
+        throw error;
+      }
+
+      // Atualizar estado local
       setConnections(prev => prev.filter(conn => conn.id !== connectionId));
       
       toast({
@@ -244,6 +276,7 @@ const Dashboard = () => {
         description: "Conexão removida com sucesso.",
       });
     } catch (error) {
+      console.error('Erro ao excluir conexão:', error);
       toast({
         title: "Erro",
         description: "Falha ao excluir. Tente novamente.",

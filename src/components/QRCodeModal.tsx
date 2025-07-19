@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,7 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState("");
-  const [countdown, setCountdown] = useState(30);
+  const [countdown, setCountdown] = useState(60); // Aumentado para 60 segundos
   const { toast } = useToast();
 
   useEffect(() => {
@@ -38,34 +39,40 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
       if (connection?.qrCode) {
         setQrCode(connection.qrCode);
         setIsLoading(false);
-        setCountdown(30);
+        setCountdown(60);
       } else {
         generateQRCode();
       }
     }
   }, [isOpen, instanceId, connection]);
 
+  // Contador regressivo
   useEffect(() => {
-    if (isOpen && !isConnected && countdown > 0) {
+    if (isOpen && !isConnected && countdown > 0 && qrCode) {
       const timer = setTimeout(() => setCountdown(prev => prev - 1), 1000);
       return () => clearTimeout(timer);
-    } else if (countdown === 0) {
+    } else if (countdown === 0 && !isConnected) {
+      // Apenas gerar novo QR code se ainda não conectou
       generateQRCode();
     }
-  }, [isOpen, countdown, isConnected]);
+  }, [isOpen, countdown, isConnected, qrCode]);
 
   // Polling para verificar se a conexão foi estabelecida
   useEffect(() => {
     if (isOpen && instanceId && qrCode && !isConnected) {
       const checkConnection = async () => {
         try {
+          console.log(`Verificando conexão para instância: ${instanceId}`);
+          
           const response = await fetch(`https://webhook.abbadigital.com.br/webhook/pega-dados-da-conexao-matte?instanceId=${instanceId}`);
           
           if (response.ok) {
             const data = await response.json();
+            console.log('Resposta da verificação:', data);
             
-            // Se retornou dados válidos, significa que a conexão foi estabelecida
+            // Verificar se retornou os dados esperados do JSON
             if (data.profilename && data.contato) {
+              console.log('Conexão estabelecida com sucesso!');
               setIsConnected(true);
               onConnectionSuccess(instanceId, data.contato, data);
               toast({
@@ -73,6 +80,8 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
                 description: `WhatsApp conectado com sucesso para ${data.profilename}`,
               });
             }
+          } else {
+            console.log('Ainda não conectado, status:', response.status);
           }
         } catch (error) {
           console.log("Verificando conexão...", error);
@@ -91,35 +100,20 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
     
     setIsLoading(true);
     setError("");
-    setCountdown(30);
+    setCountdown(60); // Reset para 60 segundos
     
     try {
-      // TODO: Integrar com n8n webhook para obter QR Code
       console.log("Gerando QR Code para instância:", instanceId);
       
-      // Simulação de QR Code (base64)
+      // TODO: Integrar com n8n webhook para obter QR Code
+      // Por enquanto, simular QR Code
       await new Promise(resolve => setTimeout(resolve, 1500));
       
       const mockQRCode = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
       setQrCode(mockQRCode);
       
-      // Simular conexão após alguns segundos
-      setTimeout(() => {
-        if (!isConnected) {
-          setIsConnected(true);
-          onConnectionSuccess(instanceId, "+55 11 99999-8888", {
-            profilename: "Usuário Teste",
-            contato: "+5511999998888",
-            fotodoperfil: ""
-          });
-          toast({
-            title: "Conectado!",
-            description: "WhatsApp conectado com sucesso.",
-          });
-        }
-      }, 8000);
-      
     } catch (error) {
+      console.error('Erro ao gerar QR Code:', error);
       setError("Falha ao gerar QR Code. Tente novamente.");
     } finally {
       setIsLoading(false);
@@ -127,10 +121,22 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
   };
 
   const handleClose = () => {
+    // Só permitir fechar se conectado ou se explicitamente cancelado
+    if (isConnected || !qrCode) {
+      setQrCode("");
+      setIsConnected(false);
+      setError("");
+      setCountdown(60);
+      onClose();
+    }
+  };
+
+  const handleCancel = () => {
+    // Forçar fechamento
     setQrCode("");
     setIsConnected(false);
     setError("");
-    setCountdown(30);
+    setCountdown(60);
     onClose();
   };
 
@@ -184,9 +190,12 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
                       className="mx-auto h-48 w-48 border rounded-lg bg-white p-2"
                     />
                     <div className="text-sm text-muted-foreground">
-                      <p>O QR Code expira em {countdown}s</p>
+                      <p className="font-medium">O QR Code expira em {countdown}s</p>
                       <p className="mt-1">
                         Abra o WhatsApp → Dispositivos conectados → Conectar dispositivo
+                      </p>
+                      <p className="mt-2 text-xs">
+                        Aguardando conexão... Verificando a cada 3 segundos.
                       </p>
                     </div>
                   </div>
@@ -212,9 +221,15 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
           )}
 
           <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={handleClose}>
-              {isConnected ? "Fechar" : "Cancelar"}
-            </Button>
+            {isConnected ? (
+              <Button onClick={handleClose}>
+                Fechar
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={handleCancel}>
+                Cancelar
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>
