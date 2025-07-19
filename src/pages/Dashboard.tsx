@@ -1,4 +1,6 @@
+
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +43,7 @@ const Dashboard = () => {
   const [isCreatingConnection, setIsCreatingConnection] = useState(false);
   const [user, setUser] = useState<any>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   // Verificar autenticação e carregar conexões do Supabase
   useEffect(() => {
@@ -48,20 +51,27 @@ const Dashboard = () => {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        // Para desenvolvimento, criar um usuário temporário
-        const { data, error } = await supabase.auth.signInAnonymously();
-        if (error) {
-          console.error('Erro ao criar sessão anônima:', error);
-          return;
-        }
-        setUser(data.user);
-      } else {
-        setUser(session.user);
+        // Se não há sessão, redirecionar para login
+        navigate("/login");
+        return;
       }
+      
+      setUser(session.user);
     };
 
     initializeUser();
-  }, []);
+
+    // Escutar mudanças na autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        navigate("/login");
+      } else if (session) {
+        setUser(session.user);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   useEffect(() => {
     if (!user) return;
@@ -74,6 +84,7 @@ const Dashboard = () => {
           .from('agents')
           .select('*')
           .eq('type', 'whatsapp')
+          .eq('user_id', user.id)
           .order('created_at', { ascending: false });
 
         if (error) {
@@ -241,12 +252,28 @@ const Dashboard = () => {
     }
   };
 
-  const handleLogout = () => {
-    // TODO: Implementar logout com Supabase
-    toast({
-      title: "Logout realizado",
-      description: "Até mais!",
-    });
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Logout realizado",
+        description: "Até mais!",
+      });
+
+      // O redirecionamento será feito automaticamente pelo listener onAuthStateChange
+    } catch (error) {
+      console.error('Erro no logout:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao fazer logout.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (isLoading) {
@@ -286,7 +313,7 @@ const Dashboard = () => {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2 text-sm text-muted-foreground">
               <User className="h-4 w-4" />
-              <span>usuário@email.com</span>
+              <span>{user?.email || 'Usuário'}</span>
             </div>
             <Button variant="outline" size="sm" onClick={handleLogout}>
               <LogOut className="h-4 w-4 mr-2" />

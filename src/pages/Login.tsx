@@ -1,12 +1,14 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Eye, EyeOff, MessageSquare } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -15,6 +17,18 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const { toast } = useToast();
+  const navigate = useNavigate();
+
+  // Verificar se já está logado
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        navigate("/dashboard");
+      }
+    };
+    checkAuth();
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,19 +36,31 @@ const Login = () => {
     setError("");
 
     try {
-      // TODO: Implementar login com Supabase
-      console.log("Login attempt:", { email, password });
-      
-      // Simulação temporária
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      toast({
-        title: "Login realizado com sucesso!",
-        description: "Redirecionando para o dashboard...",
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.user) {
+        toast({
+          title: "Login realizado com sucesso!",
+          description: "Redirecionando para o dashboard...",
+        });
+        
+        navigate("/dashboard");
+      }
       
-    } catch (error) {
-      setError("Credenciais inválidas ou conta não ativada");
+    } catch (error: any) {
+      console.error('Erro no login:', error);
+      setError(
+        error.message === "Invalid login credentials" 
+          ? "Credenciais inválidas. Verifique seu email e senha."
+          : "Erro ao fazer login. Tente novamente."
+      );
     } finally {
       setIsLoading(false);
     }
