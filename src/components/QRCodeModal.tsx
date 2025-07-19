@@ -71,7 +71,7 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
         try {
           console.log(`Verificando conexão para instância: ${instanceId}`);
           
-          const response = await fetch(`https://webhook.abbadigital.com.br/api/instance/profile/${instanceId}`);
+          const response = await fetch(`https://webhook.abbadigital.com.br/webhook/pega-dados-da-conexao-matte`);
           
           if (response.ok) {
             const data = await response.json();
