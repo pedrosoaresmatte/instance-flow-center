@@ -29,8 +29,10 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
   const [qrCode, setQrCode] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
+  const [isExpired, setIsExpired] = useState(false);
   const [error, setError] = useState("");
-  const [countdown, setCountdown] = useState(60); // Aumentado para 60 segundos
+  const [countdown, setCountdown] = useState(60);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -40,6 +42,7 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
         setQrCode(connection.qrCode);
         setIsLoading(false);
         setCountdown(60);
+        setIsExpired(false);
       } else {
         generateQRCode();
       }
@@ -48,36 +51,72 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
 
   // Contador regressivo
   useEffect(() => {
-    if (isOpen && !isConnected && countdown > 0 && qrCode) {
+    if (isOpen && !isConnected && countdown > 0 && qrCode && !isExpired) {
       const timer = setTimeout(() => setCountdown(prev => prev - 1), 1000);
       return () => clearTimeout(timer);
     } else if (countdown === 0 && !isConnected) {
-      // Apenas gerar novo QR code se ainda não conectou
-      generateQRCode();
+      // QR Code expirou
+      setIsExpired(true);
+      setIsPolling(false);
+      setError("QR Code expirado. Gere um novo para continuar.");
     }
-  }, [isOpen, countdown, isConnected, qrCode]);
+  }, [isOpen, countdown, isConnected, qrCode, isExpired]);
 
-  // Polling para verificar se a conexão foi estabelecida
+  // Polling para verificar se a conexão foi estabelecida (a cada 3 segundos)
   useEffect(() => {
-    if (isOpen && instanceId && qrCode && !isConnected) {
+    if (isOpen && instanceId && qrCode && !isConnected && !isExpired && countdown > 0) {
+      setIsPolling(true);
+      
       const checkConnection = async () => {
         try {
           console.log(`Verificando conexão para instância: ${instanceId}`);
           
-          const response = await fetch(`https://webhook.abbadigital.com.br/webhook/pega-dados-da-conexao-matte?instanceId=${instanceId}`);
+          const response = await fetch(`https://webhook.abbadigital.com.br/api/instance/profile/${instanceId}`);
           
           if (response.ok) {
             const data = await response.json();
             console.log('Resposta da verificação:', data);
             
-            // Verificar se retornou os dados esperados do JSON
-            if (data.profilename && data.contato) {
+            // Verificar se retornou os dados válidos do perfil conectado
+            if (data.profilename && data.contato && data.fotodoperfil) {
               console.log('Conexão estabelecida com sucesso!');
+              
+              // Parar o polling imediatamente
+              setIsPolling(false);
               setIsConnected(true);
-              onConnectionSuccess(instanceId, data.contato, data);
+              
+              // Processar a foto do perfil
+              let profileImageBase64 = null;
+              if (data.fotodoperfil) {
+                try {
+                  // Baixar e converter a imagem para base64
+                  const imageResponse = await fetch(data.fotodoperfil);
+                  if (imageResponse.ok) {
+                    const imageBlob = await imageResponse.blob();
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      profileImageBase64 = reader.result as string;
+                    };
+                    reader.readAsDataURL(imageBlob);
+                  }
+                } catch (imageError) {
+                  console.log('Erro ao processar imagem do perfil:', imageError);
+                }
+              }
+              
+              // Preparar dados do perfil para salvar
+              const profileData = {
+                profilename: data.profilename,
+                contato: data.contato,
+                fotodoperfil: data.fotodoperfil,
+                profileImageBase64: profileImageBase64
+              };
+              
+              onConnectionSuccess(instanceId, data.contato, profileData);
+              
               toast({
-                title: "Conectado!",
-                description: `WhatsApp conectado com sucesso para ${data.profilename}`,
+                title: "WhatsApp Conectado!",
+                description: `Conectado com sucesso para ${data.profilename}`,
               });
               
               // Fechar o modal automaticamente após 2 segundos
@@ -86,26 +125,34 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
               }, 2000);
             }
           } else {
-            console.log('Ainda não conectado, status:', response.status);
+            console.log('Ancora não conectado, status:', response.status);
           }
         } catch (error) {
           console.log("Verificando conexão...", error);
         }
       };
 
-      // Verificar a cada 3 segundos
+      // Verificar imediatamente e depois a cada 3 segundos
+      checkConnection();
       const interval = setInterval(checkConnection, 3000);
       
-      return () => clearInterval(interval);
+      return () => {
+        clearInterval(interval);
+        setIsPolling(false);
+      };
+    } else {
+      setIsPolling(false);
     }
-  }, [isOpen, instanceId, qrCode, isConnected, onConnectionSuccess, toast]);
+  }, [isOpen, instanceId, qrCode, isConnected, isExpired, countdown, onConnectionSuccess, toast]);
 
   const generateQRCode = async () => {
     if (!instanceId) return;
     
     setIsLoading(true);
     setError("");
-    setCountdown(60); // Reset para 60 segundos
+    setCountdown(60);
+    setIsExpired(false);
+    setIsConnected(false);
     
     try {
       console.log("Gerando QR Code para instância:", instanceId);
@@ -126,12 +173,9 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
   };
 
   const handleClose = () => {
-    // Só permitir fechar se conectado, sem QR code, ou se for cancelamento manual
+    // Só permitir fechar se conectado
     if (isConnected) {
-      setQrCode("");
-      setIsConnected(false);
-      setError("");
-      setCountdown(60);
+      resetModal();
       onClose();
     }
     // Se não conectado e tem QR code, não fecha (usuário deve usar cancelar)
@@ -139,11 +183,17 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
 
   const handleCancel = () => {
     // Forçar fechamento
+    resetModal();
+    onClose();
+  };
+
+  const resetModal = () => {
     setQrCode("");
     setIsConnected(false);
+    setIsPolling(false);
+    setIsExpired(false);
     setError("");
     setCountdown(60);
-    onClose();
   };
 
   return (
@@ -152,11 +202,13 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             <span>Conectar WhatsApp</span>
-            {isConnected && <CheckCircle className="h-5 w-5 text-success" />}
+            {isConnected && <CheckCircle className="h-5 w-5 text-green-500" />}
           </DialogTitle>
           <DialogDescription>
             {isConnected 
               ? "WhatsApp conectado com sucesso!"
+              : isExpired
+              ? "QR Code expirado. Gere um novo para continuar."
               : "Escaneie o QR Code com seu WhatsApp para conectar"
             }
           </DialogDescription>
@@ -172,8 +224,8 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
 
           {isConnected ? (
             <div className="text-center py-8">
-              <CheckCircle className="h-16 w-16 text-success mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-success mb-2">
+              <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-green-600 mb-2">
                 Conectado com sucesso!
               </h3>
               <p className="text-muted-foreground">
@@ -188,7 +240,7 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
                     <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
                     <p className="text-muted-foreground">Gerando QR Code...</p>
                   </div>
-                ) : qrCode ? (
+                ) : qrCode && !isExpired ? (
                   <div className="space-y-4">
                     <img 
                       src={qrCode} 
@@ -200,10 +252,25 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
                       <p className="mt-1">
                         Abra o WhatsApp → Dispositivos conectados → Conectar dispositivo
                       </p>
-                      <p className="mt-2 text-xs">
-                        Aguardando conexão... Verificando a cada 3 segundos.
-                      </p>
+                      {isPolling && (
+                        <div className="mt-3 flex items-center justify-center space-x-2">
+                          <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                          <p className="text-xs text-blue-600">
+                            Aguardando escaneamento... Verificando a cada 3 segundos.
+                          </p>
+                        </div>
+                      )}
                     </div>
+                  </div>
+                ) : isExpired ? (
+                  <div className="text-center py-8">
+                    <AlertCircle className="h-16 w-16 text-orange-500 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-orange-600 mb-2">
+                      QR Code Expirado
+                    </h3>
+                    <p className="text-muted-foreground mb-4">
+                      O QR Code expirou após 60 segundos. Gere um novo para continuar.
+                    </p>
                   </div>
                 ) : (
                   <div className="text-muted-foreground">
@@ -212,17 +279,32 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
                 )}
               </div>
 
-              <div className="flex space-x-2">
-                <Button 
-                  variant="outline" 
-                  onClick={generateQRCode} 
-                  disabled={isLoading}
-                  className="flex-1"
-                >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                  Atualizar QR Code
-                </Button>
-              </div>
+              {!isExpired && (
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={generateQRCode} 
+                    disabled={isLoading || isPolling}
+                    className="flex-1"
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                    Atualizar QR Code
+                  </Button>
+                </div>
+              )}
+
+              {isExpired && (
+                <div className="flex space-x-2">
+                  <Button 
+                    onClick={generateQRCode} 
+                    disabled={isLoading}
+                    className="flex-1"
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                    Gerar Novo QR Code
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
