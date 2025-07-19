@@ -54,6 +54,38 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
     }
   }, [isOpen, countdown, isConnected]);
 
+  // Polling para verificar se a conexão foi estabelecida
+  useEffect(() => {
+    if (isOpen && instanceId && qrCode && !isConnected) {
+      const checkConnection = async () => {
+        try {
+          const response = await fetch(`https://webhook.abbadigital.com.br/webhook/pega-dados-da-conexao-matte?instanceId=${instanceId}`);
+          
+          if (response.ok) {
+            const data = await response.json();
+            
+            // Se retornou dados válidos, significa que a conexão foi estabelecida
+            if (data.profilename && data.contato) {
+              setIsConnected(true);
+              onConnectionSuccess(instanceId, data.contato);
+              toast({
+                title: "Conectado!",
+                description: `WhatsApp conectado com sucesso para ${data.profilename}`,
+              });
+            }
+          }
+        } catch (error) {
+          console.log("Verificando conexão...", error);
+        }
+      };
+
+      // Verificar a cada 3 segundos
+      const interval = setInterval(checkConnection, 3000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [isOpen, instanceId, qrCode, isConnected, onConnectionSuccess, toast]);
+
   const generateQRCode = async () => {
     if (!instanceId) return;
     
