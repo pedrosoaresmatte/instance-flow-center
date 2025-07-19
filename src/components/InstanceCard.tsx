@@ -1,6 +1,8 @@
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { 
   QrCode, 
   Power, 
@@ -25,6 +27,9 @@ interface WhatsAppInstance {
   phone?: string;
   createdAt: string;
   lastActivity?: string;
+  whatsapp_profile_name?: string;
+  whatsapp_profile_picture_url?: string;
+  whatsapp_profile_picture_data?: string;
 }
 
 interface InstanceCardProps {
@@ -109,16 +114,41 @@ const InstanceCard = ({ instance, onConnect, onDisconnect, onDelete }: InstanceC
     }
   };
 
+  // Função para obter as iniciais do nome para o fallback do avatar
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
   return (
     <Card className="relative">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center space-x-3">
-            <div className="h-10 w-10 bg-secondary/10 rounded-lg flex items-center justify-center">
-              <Smartphone className="h-5 w-5 text-secondary" />
-            </div>
+            {/* Avatar com foto do perfil ou fallback */}
+            <Avatar className="h-10 w-10">
+              {instance.whatsapp_profile_picture_url && (
+                <AvatarImage 
+                  src={instance.whatsapp_profile_picture_url} 
+                  alt={instance.whatsapp_profile_name || instance.name}
+                />
+              )}
+              <AvatarFallback className="bg-secondary/10 text-secondary">
+                {instance.status === "connected" && instance.whatsapp_profile_name
+                  ? getInitials(instance.whatsapp_profile_name)
+                  : getInitials(instance.name)
+                }
+              </AvatarFallback>
+            </Avatar>
+            
             <div>
-              <CardTitle className="text-lg">{instance.name}</CardTitle>
+              <CardTitle className="text-lg">
+                {instance.whatsapp_profile_name || instance.name}
+              </CardTitle>
               <CardDescription>
                 {instance.phone || "Não conectado"}
               </CardDescription>

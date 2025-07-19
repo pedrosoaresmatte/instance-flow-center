@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -32,6 +31,9 @@ interface WhatsAppConnection {
   lastActivity?: string;
   qrCode?: string;
   qrCodeText?: string;
+  whatsapp_profile_name?: string;
+  whatsapp_profile_picture_url?: string;
+  whatsapp_profile_picture_data?: string;
 }
 
 const Dashboard = () => {
@@ -97,7 +99,7 @@ const Dashboard = () => {
           return;
         }
 
-        // Mapear dados do banco para a interface
+        // Mapear dados do banco para a interface incluindo dados do perfil
         const mappedConnections: WhatsAppConnection[] = conexoes?.map(conexao => ({
           id: conexao.id,
           name: conexao.name,
@@ -106,6 +108,9 @@ const Dashboard = () => {
           phone: conexao.whatsapp_contact,
           createdAt: conexao.created_at,
           lastActivity: conexao.whatsapp_connected_at,
+          whatsapp_profile_name: conexao.whatsapp_profile_name,
+          whatsapp_profile_picture_url: conexao.whatsapp_profile_picture_url,
+          whatsapp_profile_picture_data: conexao.whatsapp_profile_picture_data,
         })) || [];
         
         setConnections(mappedConnections);
@@ -237,7 +242,7 @@ const Dashboard = () => {
       setConnections(prev =>
         prev.map(conn =>
           conn.id === connectionId
-            ? { ...conn, status: "disconnected" as const, phone: undefined }
+            ? { ...conn, status: "disconnected" as const, phone: undefined, whatsapp_profile_name: undefined, whatsapp_profile_picture_url: undefined }
             : conn
         )
       );
@@ -438,11 +443,17 @@ const Dashboard = () => {
               console.error('Erro ao atualizar conexão:', error);
             }
 
-            // Atualizar estado local
+            // Atualizar estado local incluindo dados do perfil
             setConnections(prev =>
               prev.map(conn =>
                 conn.id === connectionId
-                  ? { ...conn, status: "connected" as const, phone }
+                  ? { 
+                      ...conn, 
+                      status: "connected" as const, 
+                      phone,
+                      whatsapp_profile_name: profileData?.profilename,
+                      whatsapp_profile_picture_url: profileData?.fotodoperfil
+                    }
                   : conn
               )
             );
