@@ -231,11 +231,14 @@ const Dashboard = () => {
       console.log('Dados do QR Code recebidos:', qrData);
 
       // Atualizar a conexão local com os dados do QR code
+      const qrCodeImage = qrData.base64 ? (qrData.base64.startsWith('data:image') ? qrData.base64 : `data:image/png;base64,${qrData.base64}`) : undefined;
+      console.log('QR Code processado:', qrCodeImage);
+      
       const updatedConnections = connections.map(conn => 
         conn.id === connectionId 
           ? { 
               ...conn, 
-              qrCode: qrData.base64 ? (qrData.base64.startsWith('data:image') ? qrData.base64 : `data:image/png;base64,${qrData.base64}`) : undefined,
+              qrCode: qrCodeImage,
               qrCodeText: qrData.qrCodeText,
               status: 'qr_code' as const
             }
