@@ -47,6 +47,7 @@ const Dashboard = () => {
   const [isCreatingConnection, setIsCreatingConnection] = useState(false);
   const [connectingInstanceId, setConnectingInstanceId] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -128,16 +129,40 @@ const Dashboard = () => {
       }
       
       setUser(session.user);
+      
+      // Verificar se é admin
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('user_id', session.user.id)
+        .single();
+
+      if (profile && profile.role === 'admin') {
+        setIsAdmin(true);
+      }
     };
 
     initializeUser();
 
     // Escutar mudanças na autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
         navigate("/login");
       } else if (session) {
         setUser(session.user);
+        
+        // Verificar se é admin
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .single();
+
+        if (profile && profile.role === 'admin') {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+        }
       }
     });
 
@@ -507,9 +532,11 @@ const Dashboard = () => {
             </div>
             
             <div className="flex items-center space-x-2">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/admin')}>
-                Admin
-              </Button>
+              {isAdmin && (
+                <Button variant="ghost" size="sm" onClick={() => navigate('/admin')}>
+                  Admin
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Sair

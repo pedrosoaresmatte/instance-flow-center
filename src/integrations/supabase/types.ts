@@ -107,6 +107,10 @@ export type Database = {
         Args: { user_uuid: string }
         Returns: number
       }
+      is_admin: {
+        Args: { user_uuid?: string }
+        Returns: boolean
+      }
     }
     Enums: {
       agent_channel:

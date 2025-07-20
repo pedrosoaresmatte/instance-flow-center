@@ -46,11 +46,50 @@ const Admin = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // Verificar se o usuário atual é admin
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        navigate('/');
+        return;
+      }
+
+      setCurrentUser(user);
+
+      // Verificar se é admin
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error || !profile || profile.role !== 'admin') {
+        toast({
+          title: "Acesso negado",
+          description: "Você não tem permissão para acessar esta área.",
+          variant: "destructive",
+        });
+        navigate('/dashboard');
+        return;
+      }
+
+      setIsAdmin(true);
+    };
+
+    checkUser();
+  }, [navigate, toast]);
+
   // Carregar usuários reais do Supabase
   useEffect(() => {
+    if (!isAdmin) return; // Só carregar se for admin
+
     const loadUsers = async () => {
       setIsLoading(true);
       
@@ -113,7 +152,7 @@ const Admin = () => {
     };
 
     loadUsers();
-  }, [toast]);
+  }, [toast, isAdmin]);
 
   const handleActivateUser = async (userId: string) => {
     try {
@@ -143,6 +182,39 @@ const Admin = () => {
       toast({
         title: "Erro",
         description: "Falha ao ativar usuário.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePromoteToAdmin = async (userId: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: 'admin' })
+        .eq('id', userId);
+
+      if (error) {
+        throw error;
+      }
+      
+      setUsers(prev =>
+        prev.map(user =>
+          user.id === userId
+            ? { ...user, role: 'admin' as 'admin' | 'user' }
+            : user
+        )
+      );
+      
+      toast({
+        title: "Usuário promovido",
+        description: "O usuário agora tem privilégios de administrador.",
+      });
+    } catch (error) {
+      console.error('Erro ao promover usuário:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao promover usuário a admin.",
         variant: "destructive",
       });
     }
@@ -224,14 +296,16 @@ const Admin = () => {
   const pendingUsersCount = users.filter(user => !user.is_active).length;
   const totalInstances = users.reduce((sum, user) => sum + user.instances_count, 0);
 
-  if (isLoading) {
+  if (isLoading || !isAdmin) {
     return (
       <div className="min-h-screen bg-background p-6">
         <div className="max-w-6xl mx-auto">
           <div className="flex justify-center items-center min-h-[400px]">
             <div className="text-center">
               <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Carregando dados administrativos...</p>
+              <p className="text-muted-foreground">
+                {!isAdmin ? 'Verificando permissões...' : 'Carregando dados administrativos...'}
+              </p>
             </div>
           </div>
         </div>
@@ -338,6 +412,7 @@ const Admin = () => {
                 <TableRow>
                   <TableHead>Nome</TableHead>
                   <TableHead>E-mail</TableHead>
+                  <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Instâncias</TableHead>
                   <TableHead>Cadastro</TableHead>
@@ -349,6 +424,11 @@ const Admin = () => {
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">{user.display_name}</TableCell>
                     <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                      <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                        {user.role === 'admin' ? 'Admin' : 'Usuário'}
+                      </Badge>
+                    </TableCell>
                     <TableCell>
                       {user.is_active ? (
                         <Badge variant="default" className="bg-success text-success-foreground">
@@ -385,6 +465,16 @@ const Admin = () => {
                             >
                               <UserCheck className="h-4 w-4 mr-2" />
                               Ativar
+                            </DropdownMenuItem>
+                          )}
+                          
+                          {user.role !== 'admin' && (
+                            <DropdownMenuItem
+                              onClick={() => handlePromoteToAdmin(user.id)}
+                              className="text-primary"
+                            >
+                              <Shield className="h-4 w-4 mr-2" />
+                              Promover a Admin
                             </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
