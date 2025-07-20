@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Eye, EyeOff, MessageSquare, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -45,16 +46,31 @@ const Register = () => {
     }
 
     try {
-      // TODO: Implementar cadastro com Supabase
-      console.log("Register attempt:", formData);
-      
-      // Simulação temporária
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Criar conta no Supabase
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            display_name: formData.name
+          }
+        }
+      });
+
+      if (signUpError) {
+        if (signUpError.message.includes('already registered')) {
+          setError("Este e-mail já está cadastrado");
+        } else {
+          setError(signUpError.message);
+        }
+        return;
+      }
       
       setIsSuccess(true);
       toast({
         title: "Cadastro realizado com sucesso!",
-        description: "Aguarde a ativação da sua conta por um administrador.",
+        description: "Verifique seu e-mail para confirmar a conta.",
       });
       
     } catch (error) {
