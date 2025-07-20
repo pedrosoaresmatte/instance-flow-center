@@ -51,7 +51,7 @@ const InstanceCard = ({ instance, onConnect, onDisconnect, onDelete }: InstanceC
         );
       case "disconnected":
         return (
-          <Badge variant="secondary" className="bg-muted text-muted-foreground">
+          <Badge variant="destructive" className="bg-destructive text-destructive-foreground">
             <WifiOff className="h-3 w-3 mr-1" />
             Desconectado
           </Badge>
