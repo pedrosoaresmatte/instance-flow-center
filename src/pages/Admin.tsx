@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,9 +25,11 @@ import {
   MoreVertical, 
   UserCheck, 
   UserX,
-  LogOut
+  LogOut,
+  ArrowLeft
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface User {
   id: string;
@@ -42,6 +45,7 @@ const Admin = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   // Simulação de dados - substituir pela integração real com Supabase
   useEffect(() => {
@@ -134,12 +138,28 @@ const Admin = () => {
     }
   };
 
-  const handleLogout = () => {
-    // TODO: Implementar logout com Supabase
-    toast({
-      title: "Logout realizado",
-      description: "Até mais!",
-    });
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Logout realizado",
+        description: "Até mais!",
+      });
+      
+      navigate('/');
+    } catch (error) {
+      console.error('Erro no logout:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao fazer logout.",
+        variant: "destructive",
+      });
+    }
   };
 
   const filteredUsers = users.filter(user =>
@@ -182,6 +202,10 @@ const Admin = () => {
       <header className="border-b bg-card">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-4">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Voltar
+            </Button>
             <div className="h-10 w-10 bg-secondary rounded-lg flex items-center justify-center">
               <Shield className="h-5 w-5 text-secondary-foreground" />
             </div>

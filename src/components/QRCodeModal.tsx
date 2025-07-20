@@ -162,7 +162,7 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
   }, [isOpen, instanceId, qrCode, isConnected, isExpired, countdown, connection?.name, onConnectionSuccess, toast]);
 
   const generateQRCode = async () => {
-    if (!instanceId || !connection?.name) return;
+    if (!instanceId || !connection?.name || isLoading) return;
     
     setIsLoading(true);
     setError("");

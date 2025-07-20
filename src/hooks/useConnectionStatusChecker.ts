@@ -25,7 +25,7 @@ export const useConnectionStatusChecker = ({
   onStatusUpdate,
   onConnectionRestored,
   isEnabled = true,
-  intervalMs = 30000 // 30 segundos por padrão
+  intervalMs = 300000 // 5 minutos por padrão
 }: UseConnectionStatusCheckerProps) => {
   const [isChecking, setIsChecking] = useState(false);
   const [lastCheckTime, setLastCheckTime] = useState<Date | null>(null);

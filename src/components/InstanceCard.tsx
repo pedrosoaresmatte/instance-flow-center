@@ -37,9 +37,10 @@ interface InstanceCardProps {
   onConnect: () => void;
   onDisconnect: () => void;
   onDelete: () => void;
+  isConnecting?: boolean;
 }
 
-const InstanceCard = ({ instance, onConnect, onDisconnect, onDelete }: InstanceCardProps) => {
+const InstanceCard = ({ instance, onConnect, onDisconnect, onDelete, isConnecting = false }: InstanceCardProps) => {
   const getStatusBadge = () => {
     switch (instance.status) {
       case "connected":
@@ -90,9 +91,9 @@ const InstanceCard = ({ instance, onConnect, onDisconnect, onDelete }: InstanceC
       case "disconnected":
       case "qr_code":
         return (
-          <Button onClick={onConnect} className="w-full">
-            <QrCode className="h-4 w-4 mr-2" />
-            Conectar
+          <Button onClick={onConnect} className="w-full" disabled={isConnecting}>
+            <QrCode className={`h-4 w-4 mr-2 ${isConnecting ? 'animate-spin' : ''}`} />
+            {isConnecting ? 'Conectando...' : 'Conectar'}
           </Button>
         );
       case "connected":

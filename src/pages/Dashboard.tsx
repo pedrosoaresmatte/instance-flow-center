@@ -45,6 +45,7 @@ const Dashboard = () => {
   const [showConnectionNameModal, setShowConnectionNameModal] = useState(false);
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
   const [isCreatingConnection, setIsCreatingConnection] = useState(false);
+  const [connectingInstanceId, setConnectingInstanceId] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -276,6 +277,7 @@ const Dashboard = () => {
   };
 
   const handleConnectConnection = async (connectionId: string) => {
+    setConnectingInstanceId(connectionId);
     try {
       const connection = connections.find(conn => conn.id === connectionId);
       if (!connection) {
@@ -317,6 +319,8 @@ const Dashboard = () => {
         description: "Erro ao iniciar conexão da instância",
         variant: "destructive",
       });
+    } finally {
+      setConnectingInstanceId(null);
     }
   };
 
@@ -501,10 +505,16 @@ const Dashboard = () => {
               <User className="h-4 w-4" />
               <span>{user?.email || 'Usuário'}</span>
             </div>
-            <Button variant="outline" size="sm" onClick={handleLogout}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Sair
-            </Button>
+            
+            <div className="flex items-center space-x-2">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/admin')}>
+                Admin
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Sair
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -525,9 +535,9 @@ const Dashboard = () => {
               Verificar Agora
             </Button>
             
-            <Button onClick={handleCreateConnection} className="flex items-center space-x-2">
-              <Plus className="h-4 w-4" />
-              <span>Nova Conexão</span>
+            <Button onClick={handleCreateConnection} disabled={isCreatingConnection} className="flex items-center space-x-2">
+              <Plus className={`h-4 w-4 ${isCreatingConnection ? 'animate-spin' : ''}`} />
+              <span>{isCreatingConnection ? 'Criando...' : 'Nova Conexão'}</span>
             </Button>
           </div>
         </div>
@@ -540,9 +550,9 @@ const Dashboard = () => {
               <CardDescription className="mb-6">
                 Crie sua primeira conexão para começar a usar o WhatsApp
               </CardDescription>
-              <Button onClick={handleCreateConnection}>
-                <Plus className="h-4 w-4 mr-2" />
-                Criar Primeira Conexão
+              <Button onClick={handleCreateConnection} disabled={isCreatingConnection}>
+                <Plus className={`h-4 w-4 mr-2 ${isCreatingConnection ? 'animate-spin' : ''}`} />
+                {isCreatingConnection ? 'Criando...' : 'Criar Primeira Conexão'}
               </Button>
             </CardContent>
           </Card>
@@ -555,6 +565,7 @@ const Dashboard = () => {
                 onConnect={() => handleConnectConnection(connection.id)}
                 onDisconnect={() => handleDisconnectConnection(connection.id)}
                 onDelete={() => handleDeleteConnection(connection.id)}
+                isConnecting={connectingInstanceId === connection.id}
               />
             ))}
           </div>
