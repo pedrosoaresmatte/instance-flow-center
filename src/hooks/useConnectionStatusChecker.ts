@@ -89,16 +89,11 @@ export const useConnectionStatusChecker = ({
                 status: dbStatus
               };
 
-              // Se desconectou, limpar dados do WhatsApp
+              // Quando desconectado, apenas atualizar o status sem limpar perfil
               if (newStatus === 'disconnected') {
-                updateData.whatsapp_contact = null;
-                updateData.whatsapp_profile_name = null;
-                updateData.whatsapp_profile_picture_url = null;
-                updateData.whatsapp_connected_at = null;
                 updateData.configuration = {
-                  connection_status: "disconnected",
-                  evolution_api_key: null,
-                  evolution_instance_name: null
+                  ...updateData.configuration,
+                  connection_status: "disconnected"
                 };
               }
 
