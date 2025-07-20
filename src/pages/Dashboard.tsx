@@ -131,15 +131,22 @@ const Dashboard = () => {
         if (!mounted) return;
 
         if (session?.user) {
-          console.log('Usuário logado:', session.user.email);
-          setUser(session.user);
-          
-          // Verificar se é admin
+          // Verificar se o usuário está ativo
           const { data: profile } = await supabase
             .from('profiles')
-            .select('role')
+            .select('role, is_active')
             .eq('user_id', session.user.id)
             .maybeSingle();
+          
+          if (!profile?.is_active) {
+            console.log('Usuário não ativo, fazendo logout');
+            await supabase.auth.signOut();
+            navigate('/login');
+            return;
+          }
+
+          console.log('Usuário logado:', session.user.email);
+          setUser(session.user);
 
           if (mounted && profile?.role === 'admin') {
             setIsAdmin(true);

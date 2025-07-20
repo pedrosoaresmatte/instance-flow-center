@@ -24,7 +24,20 @@ const Login = () => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        navigate("/dashboard");
+        // Verificar se o usuário está ativo
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_active')
+          .eq('user_id', session.user.id)
+          .single();
+        
+        if (profile?.is_active) {
+          navigate("/dashboard");
+        } else {
+          // Se usuário não está ativo, fazer logout
+          await supabase.auth.signOut();
+          setError("Sua conta não está ativa. Entre em contato com o administrador.");
+        }
       }
     };
     checkAuth();
@@ -46,6 +59,19 @@ const Login = () => {
       }
 
       if (data.user) {
+        // Verificar se o usuário está ativo
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_active')
+          .eq('user_id', data.user.id)
+          .single();
+        
+        if (!profile?.is_active) {
+          await supabase.auth.signOut();
+          setError("Sua conta não está ativa. Entre em contato com o administrador.");
+          return;
+        }
+
         toast({
           title: "Login realizado com sucesso!",
           description: "Redirecionando para o dashboard...",

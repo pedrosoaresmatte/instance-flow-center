@@ -16,6 +16,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { 
@@ -26,7 +27,8 @@ import {
   UserCheck, 
   UserX,
   LogOut,
-  ArrowLeft
+  ArrowLeft,
+  Trash2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -248,6 +250,37 @@ const Admin = () => {
       toast({
         title: "Erro",
         description: "Falha ao desativar usuário.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
+
+      if (error) {
+        throw error;
+      }
+      
+      setUsers(prev => prev.filter(user => user.id !== userId));
+      
+      toast({
+        title: "Usuário excluído",
+        description: "O usuário foi removido permanentemente do sistema.",
+      });
+    } catch (error) {
+      console.error('Erro ao excluir usuário:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao excluir usuário.",
         variant: "destructive",
       });
     }
@@ -477,6 +510,16 @@ const Admin = () => {
                               Promover a Admin
                             </DropdownMenuItem>
                           )}
+                          
+                          <DropdownMenuSeparator />
+                          
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteUser(user.id)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Excluir Usuário
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
