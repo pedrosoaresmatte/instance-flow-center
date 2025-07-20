@@ -38,15 +38,22 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
 
   useEffect(() => {
     if (isOpen && instanceId) {
-      if (isNewConnection && connection?.qrCode) {
-        // Nova conexão: usar QR code já recebido do POST
-        console.log('Nova conexão: usando QR code recebido do POST');
-        setQrCode(connection.qrCode);
-        setCountdown(60);
-        setIsExpired(false);
-        setIsConnected(false);
+      if (isNewConnection) {
+        // Nova conexão: NUNCA chamar generateQRCode, só usar QR code já recebido
+        console.log('Nova conexão: aguardando QR code do POST...');
+        if (connection?.qrCode) {
+          console.log('QR code recebido, configurando modal...');
+          setQrCode(connection.qrCode);
+          setCountdown(60);
+          setIsExpired(false);
+          setIsConnected(false);
+          setIsLoading(false);
+        } else {
+          console.log('Aguardando QR code...');
+          setIsLoading(true);
+        }
       } else {
-        // Reconexão: gerar novo QR code
+        // Reconexão: gerar novo QR code via GET
         console.log('Reconexão: gerando novo QR code...');
         generateQRCode();
       }
