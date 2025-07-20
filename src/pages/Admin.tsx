@@ -33,11 +33,13 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface User {
   id: string;
-  name: string;
+  user_id: string;
+  display_name: string;
   email: string;
-  isActive: boolean;
-  createdAt: string;
-  instancesCount: number;
+  role: 'admin' | 'user';
+  is_active: boolean;
+  created_at: string;
+  instances_count: number;
 }
 
 const Admin = () => {
@@ -47,56 +49,87 @@ const Admin = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Simulação de dados - substituir pela integração real com Supabase
+  // Carregar usuários reais do Supabase
   useEffect(() => {
     const loadUsers = async () => {
       setIsLoading(true);
       
-      // Simulação de carregamento
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Dados de exemplo
-      const mockUsers: User[] = [
-        {
-          id: "1",
-          name: "João Silva",
-          email: "joao@empresa.com",
-          isActive: true,
-          createdAt: "2024-01-15T10:30:00Z",
-          instancesCount: 2
-        },
-        {
-          id: "2",
-          name: "Maria Santos",
-          email: "maria@startup.com",
-          isActive: false,
-          createdAt: "2024-01-18T14:25:00Z",
-          instancesCount: 0
-        },
-        {
-          id: "3",
-          name: "Pedro Oliveira",
-          email: "pedro@agencia.com",
-          isActive: true,
-          createdAt: "2024-01-20T09:15:00Z",
-          instancesCount: 1
+      try {
+        // Buscar perfis com informações de email do auth.users
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select(`
+            id,
+            user_id,
+            display_name,
+            role,
+            is_active,
+            created_at
+          `);
+
+        if (profilesError) {
+          throw profilesError;
         }
-      ];
-      
-      setUsers(mockUsers);
-      setIsLoading(false);
+
+        // Para cada perfil, buscar o email do usuário e contar instâncias
+        const usersWithDetails = await Promise.all(
+          profilesData.map(async (profile) => {
+            // Buscar email do auth.users via RPC ou query direta não é possível
+            // Por isso vamos usar o display_name como email temporariamente
+            // Em produção, o email deveria ser armazenado no perfil ou obtido via função
+            
+            // Contar instâncias do usuário
+            const { data: instancesData, error: instancesError } = await supabase
+              .from('conexoes')
+              .select('id', { count: 'exact' })
+              .eq('user_id', profile.user_id);
+
+            const instancesCount = instancesError ? 0 : (instancesData?.length || 0);
+
+            return {
+              id: profile.id,
+              user_id: profile.user_id,
+              display_name: profile.display_name || 'Usuário sem nome',
+              email: profile.display_name || 'email@exemplo.com', // Temporário
+              role: profile.role,
+              is_active: profile.is_active,
+              created_at: profile.created_at,
+              instances_count: instancesCount
+            };
+          })
+        );
+
+        setUsers(usersWithDetails);
+      } catch (error) {
+        console.error('Erro ao carregar usuários:', error);
+        toast({
+          title: "Erro",
+          description: "Falha ao carregar usuários do sistema.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     loadUsers();
-  }, []);
+  }, [toast]);
 
   const handleActivateUser = async (userId: string) => {
     try {
-      // TODO: Integrar com Supabase para ativar usuário
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_active: true })
+        .eq('id', userId);
+
+      if (error) {
+        throw error;
+      }
+      
       setUsers(prev =>
         prev.map(user =>
           user.id === userId
-            ? { ...user, isActive: true }
+            ? { ...user, is_active: true }
             : user
         )
       );
@@ -106,6 +139,7 @@ const Admin = () => {
         description: "O usuário agora pode fazer login.",
       });
     } catch (error) {
+      console.error('Erro ao ativar usuário:', error);
       toast({
         title: "Erro",
         description: "Falha ao ativar usuário.",
@@ -116,11 +150,19 @@ const Admin = () => {
 
   const handleDeactivateUser = async (userId: string) => {
     try {
-      // TODO: Integrar com Supabase para desativar usuário
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_active: false })
+        .eq('id', userId);
+
+      if (error) {
+        throw error;
+      }
+      
       setUsers(prev =>
         prev.map(user =>
           user.id === userId
-            ? { ...user, isActive: false }
+            ? { ...user, is_active: false }
             : user
         )
       );
@@ -130,6 +172,7 @@ const Admin = () => {
         description: "O acesso do usuário foi suspenso.",
       });
     } catch (error) {
+      console.error('Erro ao desativar usuário:', error);
       toast({
         title: "Erro",
         description: "Falha ao desativar usuário.",
@@ -163,7 +206,7 @@ const Admin = () => {
   };
 
   const filteredUsers = users.filter(user =>
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.display_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -177,9 +220,9 @@ const Admin = () => {
     });
   };
 
-  const activeUsersCount = users.filter(user => user.isActive).length;
-  const pendingUsersCount = users.filter(user => !user.isActive).length;
-  const totalInstances = users.reduce((sum, user) => sum + user.instancesCount, 0);
+  const activeUsersCount = users.filter(user => user.is_active).length;
+  const pendingUsersCount = users.filter(user => !user.is_active).length;
+  const totalInstances = users.reduce((sum, user) => sum + user.instances_count, 0);
 
   if (isLoading) {
     return (
@@ -301,24 +344,24 @@ const Admin = () => {
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+                <TableBody>
                 {filteredUsers.map((user) => (
                   <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.name}</TableCell>
+                    <TableCell className="font-medium">{user.display_name}</TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>
-                      {user.isActive ? (
+                      {user.is_active ? (
                         <Badge variant="default" className="bg-success text-success-foreground">
                           Ativo
                         </Badge>
                       ) : (
                         <Badge variant="secondary" className="bg-warning text-warning-foreground">
-                          Pendente
+                          Inativo
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell>{user.instancesCount}</TableCell>
-                    <TableCell>{formatDate(user.createdAt)}</TableCell>
+                    <TableCell>{user.instances_count}</TableCell>
+                    <TableCell>{formatDate(user.created_at)}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -327,7 +370,7 @@ const Admin = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          {user.isActive ? (
+                          {user.is_active ? (
                             <DropdownMenuItem
                               onClick={() => handleDeactivateUser(user.id)}
                               className="text-destructive"

@@ -68,12 +68,45 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+          is_active: boolean
+          role: Database["public"]["Enums"]["user_role"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          is_active?: boolean
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          is_active?: boolean
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_instances_count: {
+        Args: { user_uuid: string }
+        Returns: number
+      }
     }
     Enums: {
       agent_channel:
@@ -89,6 +122,7 @@ export type Database = {
         | "disconnected"
         | "error"
       agent_type: "whatsapp" | "telegram" | "instagram"
+      user_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -225,6 +259,7 @@ export const Constants = {
         "error",
       ],
       agent_type: ["whatsapp", "telegram", "instagram"],
+      user_role: ["admin", "user"],
     },
   },
 } as const
