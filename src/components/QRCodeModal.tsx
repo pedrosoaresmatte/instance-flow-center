@@ -184,9 +184,10 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
       console.log('Nova resposta da requisição GET:', data);
       
       // Usar o QR code da resposta
-      if (data.qrCode) {
+      if (data.base64) {
         console.log('QR Code atualizado obtido com sucesso');
-        setQrCode(data.qrCode);
+        const qrCodeImage = data.base64.startsWith('data:image') ? data.base64 : `data:image/png;base64,${data.base64}`;
+        setQrCode(qrCodeImage);
       } else {
         throw new Error('QR Code não encontrado na resposta');
       }
