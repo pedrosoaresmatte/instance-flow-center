@@ -132,15 +132,14 @@ const Dashboard = () => {
     setIsCreatingConnection(true);
     
     try {
-      // Enviar para o webhook
+      // Enviar apenas uma requisição POST para criar instância e receber QR code
       const response = await fetch('https://webhook.abbadigital.com.br/webhook/cria-instancia-matte', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          connectionName: connectionName,
-          timestamp: new Date().toISOString()
+          connectionName: connectionName
         }),
       });
 
@@ -159,7 +158,7 @@ const Dashboard = () => {
         .from('conexoes')
         .insert({
           user_id: user.id,
-          name: result["Nome da instância"] || connectionName,
+          name: connectionName, // Usar o nome original fornecido pelo usuário
           type: 'whatsapp',
           channel: 'whatsapp',
           status: 'connecting',
@@ -167,7 +166,7 @@ const Dashboard = () => {
             connection_status: "connecting",
             evolution_api_key: null,
             evolution_instance_name: result.instanceId,
-            qr_code: result.base64,
+            qr_code: result.qrCode,
             qr_code_text: result.code
           }
         })
@@ -182,10 +181,10 @@ const Dashboard = () => {
       // Criar nova conexão localmente usando os dados salvos
       const newConnection: WhatsAppConnection = {
         id: conexao.id,
-        name: conexao.name,
+        name: connectionName, // Manter o nome original
         status: "qr_code",
         createdAt: conexao.created_at,
-        qrCode: result.base64,
+        qrCode: result.qrCode,
         qrCodeText: result.code
       };
       
@@ -206,7 +205,7 @@ const Dashboard = () => {
         variant: "destructive",
       });
     } finally {
-      setIsCreatingConnection(false);
+      // Note: não resetamos isCreatingConnection aqui, só quando o modal fechar ou conexão for bem-sucedida
     }
   };
 
@@ -499,9 +498,13 @@ const Dashboard = () => {
       {/* QR Code Modal */}
       <QRCodeModal
         isOpen={showQRModal}
-        onClose={() => setShowQRModal(false)}
+        onClose={() => {
+          setShowQRModal(false);
+          setIsCreatingConnection(false); // Reset flag when modal closes
+        }}
         instanceId={selectedConnectionId}
         connection={connections.find(conn => conn.id === selectedConnectionId)}
+        isNewConnection={isCreatingConnection}
         onConnectionSuccess={async (connectionId, phone, profileData) => {
           try {
             // Atualizar no banco de dados
@@ -540,6 +543,7 @@ const Dashboard = () => {
               )
             );
             setShowQRModal(false);
+            setIsCreatingConnection(false); // Reset flag when connection succeeds
           } catch (error) {
             console.error('Erro ao processar conexão:', error);
           }

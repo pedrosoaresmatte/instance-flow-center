@@ -23,9 +23,10 @@ interface QRCodeModalProps {
   instanceId: string | null;
   connection?: WhatsAppConnection;
   onConnectionSuccess: (instanceId: string, phone: string, profileData?: any) => void;
+  isNewConnection?: boolean; // Indica se é uma nova conexão (já tem QR code) ou reconexão
 }
 
-const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSuccess }: QRCodeModalProps) => {
+const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSuccess, isNewConnection = false }: QRCodeModalProps) => {
   const [qrCode, setQrCode] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -37,11 +38,20 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
 
   useEffect(() => {
     if (isOpen && instanceId) {
-      // Sempre gerar um novo QR code quando abrir o modal (reconexão)
-      console.log('Modal aberto, gerando novo QR code para reconexão...');
-      generateQRCode();
+      if (isNewConnection && connection?.qrCode) {
+        // Nova conexão: usar QR code já recebido do POST
+        console.log('Nova conexão: usando QR code recebido do POST');
+        setQrCode(connection.qrCode);
+        setCountdown(60);
+        setIsExpired(false);
+        setIsConnected(false);
+      } else {
+        // Reconexão: gerar novo QR code
+        console.log('Reconexão: gerando novo QR code...');
+        generateQRCode();
+      }
     }
-  }, [isOpen, instanceId]);
+  }, [isOpen, instanceId, isNewConnection, connection?.qrCode]);
 
   // Contador regressivo
   useEffect(() => {
