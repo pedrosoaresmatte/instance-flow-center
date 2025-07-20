@@ -111,6 +111,10 @@ export type Database = {
         Args: { user_uuid?: string }
         Returns: boolean
       }
+      setup_admin_user: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
     }
     Enums: {
       agent_channel:
