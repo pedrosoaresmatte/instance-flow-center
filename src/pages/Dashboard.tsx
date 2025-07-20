@@ -14,13 +14,15 @@ import {
   LogOut,
   Smartphone,
   Wifi,
-  WifiOff
+  WifiOff,
+  RefreshCw
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import QRCodeModal from "@/components/QRCodeModal";
 import InstanceCard from "@/components/InstanceCard";
 import ConnectionNameModal from "@/components/ConnectionNameModal";
+import { useConnectionStatusChecker } from "@/hooks/useConnectionStatusChecker";
 
 interface WhatsAppConnection {
   id: string;
@@ -47,13 +49,37 @@ const Dashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // Hook para verificação automática de status
+  const { isChecking, lastCheckTime, checkNow } = useConnectionStatusChecker({
+    connections: connections,
+    onStatusUpdate: (connectionId, newStatus) => {
+      setConnections(prev =>
+        prev.map(conn =>
+          conn.id === connectionId
+            ? { 
+                ...conn, 
+                status: newStatus,
+                // Limpar dados se desconectou
+                ...(newStatus === 'disconnected' && {
+                  phone: undefined,
+                  whatsapp_profile_name: undefined,
+                  whatsapp_profile_picture_url: undefined
+                })
+              }
+            : conn
+        )
+      );
+    },
+    isEnabled: !showQRModal && !showConnectionNameModal, // Pausar quando modals estão abertos
+    intervalMs: 30000 // 30 segundos
+  });
+
   // Verificar autenticação e carregar conexões do Supabase
   useEffect(() => {
     const initializeUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        // Se não há sessão, redirecionar para login
         navigate("/login");
         return;
       }
@@ -99,7 +125,6 @@ const Dashboard = () => {
           return;
         }
 
-        // Mapear dados do banco para a interface incluindo dados do perfil
         const mappedConnections: WhatsAppConnection[] = conexoes?.map(conexao => ({
           id: conexao.id,
           name: conexao.name,
@@ -134,7 +159,6 @@ const Dashboard = () => {
     setIsCreatingConnection(true);
     
     try {
-      // Enviar apenas uma requisição POST para criar instância e receber QR code
       const response = await fetch('https://webhook.abbadigital.com.br/webhook/cria-instancia-matte', {
         method: 'POST',
         headers: {
@@ -151,7 +175,6 @@ const Dashboard = () => {
 
       const result = await response.json();
       
-      // Salvar no banco de dados
       if (!user) {
         throw new Error('Usuário não autenticado');
       }
@@ -160,7 +183,7 @@ const Dashboard = () => {
         .from('conexoes')
         .insert({
           user_id: user.id,
-          name: connectionName, // Usar o nome original fornecido pelo usuário
+          name: connectionName,
           type: 'whatsapp',
           channel: 'whatsapp',
           status: 'connecting',
@@ -180,10 +203,9 @@ const Dashboard = () => {
         throw new Error('Falha ao salvar conexão no banco de dados');
       }
       
-      // Criar nova conexão localmente usando os dados salvos
       const newConnection: WhatsAppConnection = {
         id: conexao.id,
-        name: connectionName, // Manter o nome original
+        name: connectionName,
         status: "qr_code",
         createdAt: conexao.created_at,
         qrCode: result.base64,
@@ -213,13 +235,11 @@ const Dashboard = () => {
 
   const handleConnectConnection = async (connectionId: string) => {
     try {
-      // Encontrar a conexão para obter o nome da instância
       const connection = connections.find(conn => conn.id === connectionId);
       if (!connection) {
         throw new Error('Conexão não encontrada');
       }
 
-      // Enviar requisição GET para o webhook de conexão e capturar resposta JSON
       const response = await fetch(`https://webhook.abbadigital.com.br/webhook/conecta-matte?connectionName=${encodeURIComponent(connection.name)}`, {
         method: 'GET',
       });
@@ -231,7 +251,6 @@ const Dashboard = () => {
       const qrData = await response.json();
       console.log('Dados do QR Code recebidos:', qrData);
 
-      // Atualizar a conexão local com os dados do QR code
       const qrCodeImage = qrData.base64 ? (qrData.base64.startsWith('data:image') ? qrData.base64 : `data:image/png;base64,${qrData.base64}`) : undefined;
       console.log('QR Code processado:', qrCodeImage);
       
@@ -261,13 +280,11 @@ const Dashboard = () => {
 
   const handleDisconnectConnection = async (connectionId: string) => {
     try {
-      // Encontrar a conexão para obter o nome da instância
       const connection = connections.find(conn => conn.id === connectionId);
       if (!connection) {
         throw new Error('Conexão não encontrada');
       }
 
-      // Enviar requisição para o webhook de desconexão
       await fetch('https://webhook.abbadigital.com.br/webhook/desconecta-matte', {
         method: 'POST',
         headers: {
@@ -278,7 +295,6 @@ const Dashboard = () => {
         }),
       });
 
-      // Atualizar no banco de dados
       const { error } = await supabase
         .from('conexoes')
         .update({
@@ -299,7 +315,6 @@ const Dashboard = () => {
         throw error;
       }
 
-      // Atualizar estado local
       setConnections(prev =>
         prev.map(conn =>
           conn.id === connectionId
@@ -324,13 +339,11 @@ const Dashboard = () => {
 
   const handleDeleteConnection = async (connectionId: string) => {
     try {
-      // Encontrar a conexão para obter o nome da instância
       const connection = connections.find(conn => conn.id === connectionId);
       if (!connection) {
         throw new Error('Conexão não encontrada');
       }
 
-      // Enviar requisição POST para o webhook de exclusão
       const response = await fetch('https://webhook.abbadigital.com.br/webhook/exclui-instancia-matte', {
         method: 'POST',
         headers: {
@@ -343,10 +356,8 @@ const Dashboard = () => {
 
       if (!response.ok) {
         console.warn(`Erro na requisição de exclusão do webhook: ${response.status}`);
-        // Continua com a exclusão mesmo se o webhook falhar
       }
 
-      // Excluir do banco de dados
       const { error } = await supabase
         .from('conexoes')
         .delete()
@@ -356,7 +367,6 @@ const Dashboard = () => {
         throw error;
       }
 
-      // Atualizar estado local
       setConnections(prev => prev.filter(conn => conn.id !== connectionId));
       
       toast({
@@ -385,8 +395,6 @@ const Dashboard = () => {
         title: "Logout realizado",
         description: "Até mais!",
       });
-
-      // O redirecionamento será feito automaticamente pelo listener onAuthStateChange
     } catch (error) {
       console.error('Erro no logout:', error);
       toast({
@@ -432,6 +440,21 @@ const Dashboard = () => {
           </div>
           
           <div className="flex items-center space-x-4">
+            {/* Status da verificação automática */}
+            <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+              {isChecking ? (
+                <>
+                  <RefreshCw className="h-3 w-3 animate-spin" />
+                  <span>Verificando...</span>
+                </>
+              ) : lastCheckTime ? (
+                <>
+                  <Wifi className="h-3 w-3" />
+                  <span>Última verificação: {lastCheckTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                </>
+              ) : null}
+            </div>
+            
             <div className="flex items-center space-x-2 text-sm text-muted-foreground">
               <User className="h-4 w-4" />
               <span>{user?.email || 'Usuário'}</span>
@@ -454,10 +477,17 @@ const Dashboard = () => {
             </p>
           </div>
           
-          <Button onClick={handleCreateConnection} className="flex items-center space-x-2">
-            <Plus className="h-4 w-4" />
-            <span>Nova Conexão</span>
-          </Button>
+          <div className="flex items-center space-x-2">
+            <Button variant="outline" size="sm" onClick={checkNow} disabled={isChecking}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${isChecking ? 'animate-spin' : ''}`} />
+              Verificar Agora
+            </Button>
+            
+            <Button onClick={handleCreateConnection} className="flex items-center space-x-2">
+              <Plus className="h-4 w-4" />
+              <span>Nova Conexão</span>
+            </Button>
+          </div>
         </div>
 
         {connections.length === 0 ? (
@@ -502,14 +532,13 @@ const Dashboard = () => {
         isOpen={showQRModal}
         onClose={() => {
           setShowQRModal(false);
-          setIsCreatingConnection(false); // Reset flag when modal closes
+          setIsCreatingConnection(false);
         }}
         instanceId={selectedConnectionId}
         connection={connections.find(conn => conn.id === selectedConnectionId)}
         isNewConnection={isCreatingConnection}
         onConnectionSuccess={async (connectionId, phone, profileData) => {
           try {
-            // Atualizar no banco de dados
             const { error } = await supabase
               .from('conexoes')
               .update({
@@ -530,7 +559,6 @@ const Dashboard = () => {
               console.error('Erro ao atualizar conexão:', error);
             }
 
-            // Atualizar estado local incluindo dados do perfil
             setConnections(prev =>
               prev.map(conn =>
                 conn.id === connectionId
@@ -545,7 +573,7 @@ const Dashboard = () => {
               )
             );
             setShowQRModal(false);
-            setIsCreatingConnection(false); // Reset flag when connection succeeds
+            setIsCreatingConnection(false);
           } catch (error) {
             console.error('Erro ao processar conexão:', error);
           }

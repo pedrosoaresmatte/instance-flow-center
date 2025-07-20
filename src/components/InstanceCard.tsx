@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +10,8 @@ import {
   Wifi,
   WifiOff,
   Clock,
-  MoreVertical
+  MoreVertical,
+  RefreshCw
 } from "lucide-react";
 import { 
   DropdownMenu,
@@ -65,9 +65,9 @@ const InstanceCard = ({ instance, onConnect, onDisconnect, onDelete }: InstanceC
         );
       case "loading":
         return (
-          <Badge variant="outline">
-            <Clock className="h-3 w-3 mr-1" />
-            Carregando...
+          <Badge variant="outline" className="bg-orange-50 text-orange-600 border-orange-200">
+            <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+            Atualizando
           </Badge>
         );
       default:
@@ -105,8 +105,8 @@ const InstanceCard = ({ instance, onConnect, onDisconnect, onDelete }: InstanceC
       case "loading":
         return (
           <Button disabled className="w-full">
-            <Clock className="h-4 w-4 mr-2" />
-            Carregando...
+            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+            Atualizando...
           </Button>
         );
       default:
@@ -114,7 +114,6 @@ const InstanceCard = ({ instance, onConnect, onDisconnect, onDelete }: InstanceC
     }
   };
 
-  // Função para obter as iniciais do nome para o fallback do avatar
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -129,7 +128,6 @@ const InstanceCard = ({ instance, onConnect, onDisconnect, onDelete }: InstanceC
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center space-x-3">
-            {/* Avatar com foto do perfil ou fallback */}
             <Avatar className="h-10 w-10">
               {instance.whatsapp_profile_picture_url && (
                 <AvatarImage 
