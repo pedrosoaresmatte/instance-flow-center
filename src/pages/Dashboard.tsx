@@ -154,6 +154,7 @@ const Dashboard = () => {
         } else {
           console.log('Usuário não logado');
           setUser(null);
+          navigate('/login');
         }
       } catch (error) {
         console.error('Erro na inicialização:', error);
@@ -168,7 +169,7 @@ const Dashboard = () => {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [navigate]);
 
   // Carregar conexões (simplificado)
   useEffect(() => {
@@ -505,6 +506,9 @@ const Dashboard = () => {
         title: "Logout realizado",
         description: "Até mais!",
       });
+      
+      // Redirecionar para login após logout bem-sucedido
+      navigate('/login');
     } catch (error) {
       console.error('Erro no logout:', error);
       toast({
