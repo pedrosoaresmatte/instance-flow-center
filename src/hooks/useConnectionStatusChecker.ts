@@ -32,9 +32,9 @@ export const useConnectionStatusChecker = ({
   const checkConnectionStatus = useCallback(async () => {
     if (!isEnabled || connections.length === 0) return;
 
-    // Só verificar conexões que estão conectadas ou em qr_code (não loading)
+    // Só verificar conexões que estão conectadas ou em qr_code (não desconectadas)
     const connectionsToCheck = connections.filter(conn => 
-      conn.status === 'connected' || conn.status === 'disconnected' || conn.status === 'qr_code'
+      conn.status === 'connected' || conn.status === 'qr_code'
     );
 
     if (connectionsToCheck.length === 0) return;
