@@ -57,14 +57,14 @@ export const useConnectionStatusChecker = ({
           );
 
           if (response.ok) {
-            const data = await response.json();
-            console.log(`Status da conexão ${connection.name}:`, data);
+            const responseText = await response.text();
+            console.log(`Status da conexão ${connection.name}:`, responseText);
             
             let newStatus: 'connected' | 'disconnected' | 'loading';
             
-            if (data.status === 'Open') {
+            if (responseText.toLowerCase() === 'open') {
               newStatus = 'connected';
-            } else if (data.status === 'Closed') {
+            } else if (responseText.toLowerCase() === 'closed') {
               newStatus = 'disconnected';
             } else {
               // Se não retornar Open nem Closed, status é "atualizando"
