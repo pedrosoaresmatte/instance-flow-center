@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,6 +49,47 @@ const Dashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // Função para recarregar dados de uma conexão específica
+  const reloadConnectionData = useCallback(async (connectionId: string) => {
+    try {
+      const { data: conexao, error } = await supabase
+        .from('conexoes')
+        .select('*')
+        .eq('id', connectionId)
+        .single();
+
+      if (error) {
+        console.error('Erro ao recarregar dados da conexão:', error);
+        return;
+      }
+
+      const updatedConnection: WhatsAppConnection = {
+        id: conexao.id,
+        name: conexao.name,
+        status: conexao.status === 'active' ? 'connected' : 
+               conexao.status === 'connecting' ? 'qr_code' : 'disconnected',
+        phone: conexao.whatsapp_contact,
+        createdAt: conexao.created_at,
+        lastActivity: conexao.whatsapp_connected_at,
+        whatsapp_profile_name: conexao.whatsapp_profile_name,
+        whatsapp_profile_picture_url: conexao.whatsapp_profile_picture_url,
+        whatsapp_profile_picture_data: conexao.whatsapp_profile_picture_data,
+        qrCode: (conexao.configuration as any)?.qr_code,
+        qrCodeText: (conexao.configuration as any)?.qr_code_text,
+      };
+
+      setConnections(prev =>
+        prev.map(conn =>
+          conn.id === connectionId ? updatedConnection : conn
+        )
+      );
+
+      console.log('Dados da conexão recarregados:', updatedConnection);
+    } catch (error) {
+      console.error('Erro ao recarregar dados da conexão:', error);
+    }
+  }, []);
+
   // Hook para verificação automática de status
   const { isChecking, lastCheckTime, checkNow } = useConnectionStatusChecker({
     connections: connections,
@@ -70,6 +111,7 @@ const Dashboard = () => {
         )
       );
     },
+    onConnectionRestored: reloadConnectionData, // Callback para quando conexão é restaurada
     isEnabled: !showQRModal && !showConnectionNameModal, // Pausar quando modals estão abertos
     intervalMs: 30000 // 30 segundos
   });

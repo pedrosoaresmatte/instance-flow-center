@@ -15,6 +15,7 @@ interface UseConnectionStatusCheckerProps {
     status: 'connected' | 'disconnected' | 'qr_code' | 'loading';
   }>;
   onStatusUpdate: (connectionId: string, newStatus: 'connected' | 'disconnected' | 'loading') => void;
+  onConnectionRestored?: (connectionId: string) => void;
   isEnabled?: boolean;
   intervalMs?: number;
 }
@@ -22,6 +23,7 @@ interface UseConnectionStatusCheckerProps {
 export const useConnectionStatusChecker = ({
   connections,
   onStatusUpdate,
+  onConnectionRestored,
   isEnabled = true,
   intervalMs = 30000 // 30 segundos por padrão
 }: UseConnectionStatusCheckerProps) => {
@@ -29,18 +31,21 @@ export const useConnectionStatusChecker = ({
   const [lastCheckTime, setLastCheckTime] = useState<Date | null>(null);
   const { toast } = useToast();
 
-  const checkConnectionStatus = useCallback(async () => {
+  const checkConnectionStatus = useCallback(async (forceCheckAll = false) => {
     if (!isEnabled || connections.length === 0) return;
 
-    // Só verificar conexões que estão conectadas ou em qr_code (não desconectadas)
-    const connectionsToCheck = connections.filter(conn => 
-      conn.status === 'connected' || conn.status === 'qr_code'
-    );
+    // Se forceCheckAll for true (verificar agora), verificar todas as conexões
+    // Caso contrário, só verificar conexões que estão conectadas ou em qr_code
+    const connectionsToCheck = forceCheckAll 
+      ? connections 
+      : connections.filter(conn => 
+          conn.status === 'connected' || conn.status === 'qr_code'
+        );
 
     if (connectionsToCheck.length === 0) return;
 
     setIsChecking(true);
-    console.log('Iniciando verificação de status das conexões...');
+    console.log('Iniciando verificação de status das conexões...', forceCheckAll ? '(verificação completa)' : '(verificação normal)');
 
     try {
       // Verificar cada conexão individualmente
@@ -108,6 +113,12 @@ export const useConnectionStatusChecker = ({
                 // Notificar mudança de status
                 onStatusUpdate(connection.id, newStatus);
                 
+                // Se a conexão foi restaurada (voltou a ficar conectada), chamar callback
+                if (currentMappedStatus === 'disconnected' && newStatus === 'connected' && onConnectionRestored) {
+                  console.log(`Conexão ${connection.name} foi restaurada, recarregando dados...`);
+                  onConnectionRestored(connection.id);
+                }
+                
                 // Mostrar toast apenas para mudanças significativas
                 if (currentMappedStatus === 'connected' && newStatus === 'disconnected') {
                   toast({
@@ -137,7 +148,7 @@ export const useConnectionStatusChecker = ({
     } finally {
       setIsChecking(false);
     }
-  }, [connections, isEnabled, onStatusUpdate, toast]);
+  }, [connections, isEnabled, onStatusUpdate, onConnectionRestored, toast]);
 
   // Configurar intervalo de verificação
   useEffect(() => {
@@ -167,7 +178,7 @@ export const useConnectionStatusChecker = ({
       } else {
         console.log('Página visível - retomando verificações');
         // Verificar imediatamente quando a página voltar a ficar visível
-        setTimeout(checkConnectionStatus, 1000);
+        setTimeout(() => checkConnectionStatus(), 1000);
       }
     };
 
@@ -178,6 +189,6 @@ export const useConnectionStatusChecker = ({
   return {
     isChecking,
     lastCheckTime,
-    checkNow: checkConnectionStatus
+    checkNow: () => checkConnectionStatus(true) // Forçar verificação de todas as conexões
   };
 };
