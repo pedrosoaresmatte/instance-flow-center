@@ -111,6 +111,8 @@ const Dashboard = () => {
           whatsapp_profile_name: conexao.whatsapp_profile_name,
           whatsapp_profile_picture_url: conexao.whatsapp_profile_picture_url,
           whatsapp_profile_picture_data: conexao.whatsapp_profile_picture_data,
+          qrCode: (conexao.configuration as any)?.qr_code,
+          qrCodeText: (conexao.configuration as any)?.qr_code_text,
         })) || [];
         
         setConnections(mappedConnections);
@@ -166,7 +168,7 @@ const Dashboard = () => {
             connection_status: "connecting",
             evolution_api_key: null,
             evolution_instance_name: result.instanceId,
-            qr_code: result.qrCode,
+            qr_code: result.base64,
             qr_code_text: result.code
           }
         })
@@ -184,7 +186,7 @@ const Dashboard = () => {
         name: connectionName, // Manter o nome original
         status: "qr_code",
         createdAt: conexao.created_at,
-        qrCode: result.qrCode,
+        qrCode: result.base64,
         qrCodeText: result.code
       };
       
