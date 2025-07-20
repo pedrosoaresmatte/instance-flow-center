@@ -147,8 +147,13 @@ const InstanceCard = ({ instance, onConnect, onDisconnect, onDelete }: InstanceC
             
             <div>
               <CardTitle className="text-lg">
-                {instance.whatsapp_profile_name || instance.name}
+                {instance.name}
               </CardTitle>
+              {instance.whatsapp_profile_name && (
+                <div className="text-sm text-muted-foreground font-medium">
+                  {instance.whatsapp_profile_name}
+                </div>
+              )}
               <CardDescription>
                 {instance.phone || "Não conectado"}
               </CardDescription>
