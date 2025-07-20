@@ -2,19 +2,12 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
-  MessageSquare, 
   Plus, 
-  QrCode, 
-  Power, 
-  Trash2, 
   User, 
   LogOut,
   Smartphone,
   Wifi,
-  WifiOff,
   RefreshCw
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -48,11 +41,13 @@ const Dashboard = () => {
   const [connectingInstanceId, setConnectingInstanceId] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
   // Função para recarregar dados de uma conexão específica
   const reloadConnectionData = useCallback(async (connectionId: string) => {
+    console.log('Recarregando dados da conexão:', connectionId);
     try {
       const { data: conexao, error } = await supabase
         .from('conexoes')
@@ -86,23 +81,23 @@ const Dashboard = () => {
         )
       );
 
-      console.log('Dados da conexão recarregados:', updatedConnection);
+      console.log('Dados da conexão recarregados com sucesso');
     } catch (error) {
       console.error('Erro ao recarregar dados da conexão:', error);
     }
   }, []);
 
-  // Hook para verificação automática de status
+  // Hook de verificação de status (pausado quando modals estão abertos)
   const { isChecking, lastCheckTime, checkNow } = useConnectionStatusChecker({
     connections: connections,
     onStatusUpdate: (connectionId, newStatus) => {
+      console.log('Status atualizado:', connectionId, newStatus);
       setConnections(prev =>
         prev.map(conn =>
           conn.id === connectionId
             ? { 
                 ...conn, 
                 status: newStatus,
-                // Limpar dados se desconectou
                 ...(newStatus === 'disconnected' && {
                   phone: undefined,
                   whatsapp_profile_name: undefined,
@@ -113,121 +108,148 @@ const Dashboard = () => {
         )
       );
     },
-    onConnectionRestored: reloadConnectionData, // Callback para quando conexão é restaurada
-    isEnabled: !showQRModal && !showConnectionNameModal, // Pausar quando modals estão abertos
-    intervalMs: 30000 // 30 segundos
+    onConnectionRestored: reloadConnectionData,
+    isEnabled: !showQRModal && !showConnectionNameModal && !isLoading,
+    intervalMs: 60000 // 1 minuto
   });
 
-  // Verificar autenticação e inicializar usuário
+  // Verificar autenticação (simplificado)
   useEffect(() => {
+    let mounted = true;
+    
     const initializeUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session) {
-        setUser(session.user);
+      try {
+        console.log('Inicializando usuário...');
+        const { data: { session }, error } = await supabase.auth.getSession();
         
-        // Verificar se é admin
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .single();
+        if (error) {
+          console.error('Erro ao obter sessão:', error);
+          setLoadingError('Erro de autenticação');
+          return;
+        }
+        
+        if (!mounted) return;
 
-        if (profile && profile.role === 'admin') {
-          setIsAdmin(true);
+        if (session?.user) {
+          console.log('Usuário logado:', session.user.email);
+          setUser(session.user);
+          
+          // Verificar se é admin
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+
+          if (mounted && profile?.role === 'admin') {
+            setIsAdmin(true);
+          }
+        } else {
+          console.log('Usuário não logado');
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('Erro na inicialização:', error);
+        if (mounted) {
+          setLoadingError('Erro ao carregar usuário');
         }
       }
-      // Não redirecionar se não estiver logado - deixar o painel aparecer
     };
 
     initializeUser();
 
-    // Escutar mudanças na autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_OUT' || !session) {
-        setUser(null);
-        setIsAdmin(false);
-        // Não redirecionar - deixar o usuário ver o painel mas sem conexões
-      } else if (session) {
-        setUser(session.user);
-        
-        // Verificar se é admin
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .single();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
-        if (profile && profile.role === 'admin') {
-          setIsAdmin(true);
-        } else {
-          setIsAdmin(false);
-        }
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-
+  // Carregar conexões (simplificado)
   useEffect(() => {
-    // Sempre carregar conexões, mas filtrar por usuário se estiver logado
+    let mounted = true;
+    
     const loadConnections = async () => {
-      setIsLoading(true);
+      console.log('Carregando conexões...');
       
-      try {
-        let query = supabase
-          .from('conexoes')
-          .select('*')
-          .eq('type', 'whatsapp');
+      // Timeout de segurança
+      const timeoutId = setTimeout(() => {
+        if (mounted) {
+          console.warn('Timeout ao carregar conexões');
+          setIsLoading(false);
+          setLoadingError('Timeout ao carregar conexões');
+        }
+      }, 15000); // 15 segundos
 
-        // Se usuário estiver logado, filtrar por suas conexões
-        if (user) {
-          query = query.eq('user_id', user.id);
-        } else {
-          // Se não estiver logado, não mostrar nenhuma conexão
+      try {
+        if (!user) {
+          console.log('Usuário não logado, sem conexões para carregar');
           setConnections([]);
           setIsLoading(false);
+          clearTimeout(timeoutId);
           return;
         }
 
-        const { data: conexoes, error } = await query.order('created_at', { ascending: false });
+        const { data: conexoes, error } = await supabase
+          .from('conexoes')
+          .select('*')
+          .eq('type', 'whatsapp')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (!mounted) {
+          clearTimeout(timeoutId);
+          return;
+        }
 
         if (error) {
           console.error('Erro ao carregar conexões:', error);
+          setLoadingError('Erro ao carregar conexões');
           toast({
             title: "Erro",
             description: "Falha ao carregar conexões.",
             variant: "destructive",
           });
-          setIsLoading(false);
-          return;
+        } else {
+          console.log('Conexões carregadas:', conexoes?.length || 0);
+          
+          const mappedConnections: WhatsAppConnection[] = conexoes?.map(conexao => ({
+            id: conexao.id,
+            name: conexao.name,
+            status: conexao.status === 'active' ? 'connected' : 
+                   conexao.status === 'connecting' ? 'qr_code' : 'disconnected',
+            phone: conexao.whatsapp_contact,
+            createdAt: conexao.created_at,
+            lastActivity: conexao.whatsapp_connected_at,
+            whatsapp_profile_name: conexao.whatsapp_profile_name,
+            whatsapp_profile_picture_url: conexao.whatsapp_profile_picture_url,
+            whatsapp_profile_picture_data: conexao.whatsapp_profile_picture_data,
+            qrCode: (conexao.configuration as any)?.qr_code,
+            qrCodeText: (conexao.configuration as any)?.qr_code_text,
+          })) || [];
+          
+          setConnections(mappedConnections);
+          setLoadingError(null);
         }
-
-        const mappedConnections: WhatsAppConnection[] = conexoes?.map(conexao => ({
-          id: conexao.id,
-          name: conexao.name,
-          status: conexao.status === 'active' ? 'connected' : 
-                 conexao.status === 'connecting' ? 'qr_code' : 'disconnected',
-          phone: conexao.whatsapp_contact,
-          createdAt: conexao.created_at,
-          lastActivity: conexao.whatsapp_connected_at,
-          whatsapp_profile_name: conexao.whatsapp_profile_name,
-          whatsapp_profile_picture_url: conexao.whatsapp_profile_picture_url,
-          whatsapp_profile_picture_data: conexao.whatsapp_profile_picture_data,
-          qrCode: (conexao.configuration as any)?.qr_code,
-          qrCodeText: (conexao.configuration as any)?.qr_code_text,
-        })) || [];
-        
-        setConnections(mappedConnections);
       } catch (error) {
-        console.error('Erro inesperado:', error);
+        console.error('Erro inesperado ao carregar conexões:', error);
+        if (mounted) {
+          setLoadingError('Erro inesperado');
+        }
       } finally {
-        setIsLoading(false);
+        if (mounted) {
+          setIsLoading(false);
+        }
+        clearTimeout(timeoutId);
       }
     };
 
-    loadConnections();
-  }, [user]); // Remover dependência de user ser obrigatório
+    if (user !== undefined) { // Só carregar quando user foi definido (null ou objeto)
+      loadConnections();
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [user, toast]);
 
   const handleCreateConnection = () => {
     setShowConnectionNameModal(true);
@@ -486,6 +508,7 @@ const Dashboard = () => {
     }
   };
 
+  // Tela de loading com timeout
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background p-6">
@@ -493,7 +516,22 @@ const Dashboard = () => {
           <div className="flex justify-center items-center min-h-[400px]">
             <div className="text-center">
               <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Carregando suas conexões...</p>
+              <p className="text-muted-foreground mb-2">Carregando suas conexões...</p>
+              {loadingError && (
+                <div className="mt-4">
+                  <p className="text-red-500 text-sm mb-2">{loadingError}</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      setLoadingError(null);
+                      setIsLoading(false);
+                    }}
+                  >
+                    Continuar mesmo assim
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -572,19 +610,19 @@ const Dashboard = () => {
             </p>
           </div>
           
-            <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm" onClick={checkNow} disabled={isChecking}>
-                <RefreshCw className={`h-4 w-4 mr-2 ${isChecking ? 'animate-spin' : ''}`} />
-                Verificar Agora
+          <div className="flex items-center space-x-2">
+            <Button variant="outline" size="sm" onClick={checkNow} disabled={isChecking}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${isChecking ? 'animate-spin' : ''}`} />
+              Verificar Agora
+            </Button>
+            
+            {user && (
+              <Button onClick={handleCreateConnection} disabled={isCreatingConnection} className="flex items-center space-x-2">
+                <Plus className={`h-4 w-4 ${isCreatingConnection ? 'animate-spin' : ''}`} />
+                <span>{isCreatingConnection ? 'Criando...' : 'Nova Conexão'}</span>
               </Button>
-              
-              {user && (
-                <Button onClick={handleCreateConnection} disabled={isCreatingConnection} className="flex items-center space-x-2">
-                  <Plus className={`h-4 w-4 ${isCreatingConnection ? 'animate-spin' : ''}`} />
-                  <span>{isCreatingConnection ? 'Criando...' : 'Nova Conexão'}</span>
-                </Button>
-              )}
-            </div>
+            )}
+          </div>
         </div>
 
         {connections.length === 0 ? (
