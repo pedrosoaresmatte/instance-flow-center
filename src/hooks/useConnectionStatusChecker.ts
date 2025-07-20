@@ -64,10 +64,10 @@ export const useConnectionStatusChecker = ({
             
             if (responseText.toLowerCase() === 'open') {
               newStatus = 'connected';
-            } else if (responseText.toLowerCase() === 'closed') {
+            } else if (responseText.toLowerCase() === 'close') {
               newStatus = 'disconnected';
             } else {
-              // Se não retornar Open nem Closed, status é "atualizando"
+              // Se não retornar Open nem Close, status é "atualizando"
               newStatus = 'loading';
             }
 
