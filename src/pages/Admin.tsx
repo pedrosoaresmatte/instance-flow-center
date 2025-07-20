@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import ImportInstanceModal from "@/components/ImportInstanceModal";
 
 interface User {
   id: string;
@@ -310,6 +311,56 @@ const Admin = () => {
     }
   };
 
+  const handleRefreshUsers = () => {
+    // Recarregar usuários após importar instância
+    const loadUsers = async () => {
+      try {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select(`
+            id,
+            user_id,
+            display_name,
+            role,
+            is_active,
+            created_at
+          `);
+
+        if (profilesError) {
+          throw profilesError;
+        }
+
+        const usersWithDetails = await Promise.all(
+          profilesData.map(async (profile) => {
+            const { data: instancesData, error: instancesError } = await supabase
+              .from('conexoes')
+              .select('id', { count: 'exact' })
+              .eq('user_id', profile.user_id);
+
+            const instancesCount = instancesError ? 0 : (instancesData?.length || 0);
+
+            return {
+              id: profile.id,
+              user_id: profile.user_id,
+              display_name: profile.display_name || 'Usuário sem nome',
+              email: profile.display_name || 'email@exemplo.com',
+              role: profile.role,
+              is_active: profile.is_active,
+              created_at: profile.created_at,
+              instances_count: instancesCount
+            };
+          })
+        );
+
+        setUsers(usersWithDetails);
+      } catch (error) {
+        console.error('Erro ao carregar usuários:', error);
+      }
+    };
+
+    loadUsers();
+  };
+
   const filteredUsers = users.filter(user =>
     user.display_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -365,10 +416,13 @@ const Admin = () => {
             </div>
           </div>
           
-          <Button variant="outline" size="sm" onClick={handleLogout}>
-            <LogOut className="h-4 w-4 mr-2" />
-            Sair
-          </Button>
+          <div className="flex items-center space-x-3">
+            <ImportInstanceModal users={users} onSuccess={handleRefreshUsers} />
+            <Button variant="outline" size="sm" onClick={handleLogout}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Sair
+            </Button>
+          </div>
         </div>
       </header>
 
