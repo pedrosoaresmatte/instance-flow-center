@@ -219,15 +219,9 @@ const Dashboard = () => {
         throw new Error('Conexão não encontrada');
       }
 
-      // Enviar requisição POST para o webhook de conexão
-      const response = await fetch('https://webhook.abbadigital.com.br/webhook/conecta-matte', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          connectionName: connection.name
-        }),
+      // Enviar requisição GET para o webhook de conexão e capturar resposta JSON
+      const response = await fetch(`https://webhook.abbadigital.com.br/webhook/conecta-matte?connectionName=${encodeURIComponent(connection.name)}`, {
+        method: 'GET',
       });
 
       if (!response.ok) {
