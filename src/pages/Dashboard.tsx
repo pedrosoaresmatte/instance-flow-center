@@ -199,6 +199,7 @@ const Dashboard = () => {
             description: "Falha ao carregar conexões.",
             variant: "destructive",
           });
+          setIsLoading(false);
           return;
         }
 
