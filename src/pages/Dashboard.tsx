@@ -110,7 +110,7 @@ const Dashboard = () => {
     },
     onConnectionRestored: reloadConnectionData,
     isEnabled: !showQRModal && !showConnectionNameModal && !isLoading,
-    intervalMs: 60000 // 1 minuto
+    intervalMs: 300000 // 5 minutos
   });
 
   // Verificar autenticação (simplificado)
