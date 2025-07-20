@@ -118,28 +118,26 @@ const Dashboard = () => {
     intervalMs: 30000 // 30 segundos
   });
 
-  // Verificar autenticação e carregar conexões do Supabase
+  // Verificar autenticação e inicializar usuário
   useEffect(() => {
     const initializeUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       
-      if (!session) {
-        navigate("/login");
-        return;
-      }
-      
-      setUser(session.user);
-      
-      // Verificar se é admin
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('user_id', session.user.id)
-        .single();
+      if (session) {
+        setUser(session.user);
+        
+        // Verificar se é admin
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .single();
 
-      if (profile && profile.role === 'admin') {
-        setIsAdmin(true);
+        if (profile && profile.role === 'admin') {
+          setIsAdmin(true);
+        }
       }
+      // Não redirecionar se não estiver logado - deixar o painel aparecer
     };
 
     initializeUser();
@@ -147,7 +145,9 @@ const Dashboard = () => {
     // Escutar mudanças na autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
-        navigate("/login");
+        setUser(null);
+        setIsAdmin(false);
+        // Não redirecionar - deixar o usuário ver o painel mas sem conexões
       } else if (session) {
         setUser(session.user);
         
@@ -170,18 +170,27 @@ const Dashboard = () => {
   }, [navigate]);
 
   useEffect(() => {
-    if (!user) return;
-
+    // Sempre carregar conexões, mas filtrar por usuário se estiver logado
     const loadConnections = async () => {
       setIsLoading(true);
       
       try {
-        const { data: conexoes, error } = await supabase
+        let query = supabase
           .from('conexoes')
           .select('*')
-          .eq('type', 'whatsapp')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
+          .eq('type', 'whatsapp');
+
+        // Se usuário estiver logado, filtrar por suas conexões
+        if (user) {
+          query = query.eq('user_id', user.id);
+        } else {
+          // Se não estiver logado, não mostrar nenhuma conexão
+          setConnections([]);
+          setIsLoading(false);
+          return;
+        }
+
+        const { data: conexoes, error } = await query.order('created_at', { ascending: false });
 
         if (error) {
           console.error('Erro ao carregar conexões:', error);
@@ -217,7 +226,7 @@ const Dashboard = () => {
     };
 
     loadConnections();
-  }, [user, toast]);
+  }, [user]); // Remover dependência de user ser obrigatório
 
   const handleCreateConnection = () => {
     setShowConnectionNameModal(true);
@@ -528,7 +537,7 @@ const Dashboard = () => {
             
             <div className="flex items-center space-x-2 text-sm text-muted-foreground">
               <User className="h-4 w-4" />
-              <span>{user?.email || 'Usuário'}</span>
+              <span>{user?.email || 'Usuário não logado'}</span>
             </div>
             
             <div className="flex items-center space-x-2">
@@ -537,10 +546,16 @@ const Dashboard = () => {
                   Admin
                 </Button>
               )}
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Sair
-              </Button>
+              {user ? (
+                <Button variant="outline" size="sm" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sair
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" onClick={() => navigate('/login')}>
+                  Entrar
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -556,31 +571,47 @@ const Dashboard = () => {
             </p>
           </div>
           
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm" onClick={checkNow} disabled={isChecking}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${isChecking ? 'animate-spin' : ''}`} />
-              Verificar Agora
-            </Button>
-            
-            <Button onClick={handleCreateConnection} disabled={isCreatingConnection} className="flex items-center space-x-2">
-              <Plus className={`h-4 w-4 ${isCreatingConnection ? 'animate-spin' : ''}`} />
-              <span>{isCreatingConnection ? 'Criando...' : 'Nova Conexão'}</span>
-            </Button>
-          </div>
+            <div className="flex items-center space-x-2">
+              <Button variant="outline" size="sm" onClick={checkNow} disabled={isChecking}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${isChecking ? 'animate-spin' : ''}`} />
+                Verificar Agora
+              </Button>
+              
+              {user && (
+                <Button onClick={handleCreateConnection} disabled={isCreatingConnection} className="flex items-center space-x-2">
+                  <Plus className={`h-4 w-4 ${isCreatingConnection ? 'animate-spin' : ''}`} />
+                  <span>{isCreatingConnection ? 'Criando...' : 'Nova Conexão'}</span>
+                </Button>
+              )}
+            </div>
         </div>
 
         {connections.length === 0 ? (
           <Card className="text-center py-12">
             <CardContent>
               <Smartphone className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-              <CardTitle className="mb-2">Nenhuma conexão criada</CardTitle>
-              <CardDescription className="mb-6">
-                Crie sua primeira conexão para começar a usar o WhatsApp
-              </CardDescription>
-              <Button onClick={handleCreateConnection} disabled={isCreatingConnection}>
-                <Plus className={`h-4 w-4 mr-2 ${isCreatingConnection ? 'animate-spin' : ''}`} />
-                {isCreatingConnection ? 'Criando...' : 'Criar Primeira Conexão'}
-              </Button>
+              {user ? (
+                <>
+                  <CardTitle className="mb-2">Nenhuma conexão criada</CardTitle>
+                  <CardDescription className="mb-6">
+                    Crie sua primeira conexão para começar a usar o WhatsApp
+                  </CardDescription>
+                  <Button onClick={handleCreateConnection} disabled={isCreatingConnection}>
+                    <Plus className={`h-4 w-4 mr-2 ${isCreatingConnection ? 'animate-spin' : ''}`} />
+                    {isCreatingConnection ? 'Criando...' : 'Criar Primeira Conexão'}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <CardTitle className="mb-2">Faça login para ver suas conexões</CardTitle>
+                  <CardDescription className="mb-6">
+                    Entre na sua conta para gerenciar suas conexões WhatsApp
+                  </CardDescription>
+                  <Button onClick={() => navigate('/login')}>
+                    Fazer Login
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
         ) : (
