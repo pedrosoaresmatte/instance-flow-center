@@ -196,12 +196,18 @@ const Dashboard = () => {
           return;
         }
 
-        const { data: conexoes, error } = await supabase
+        // Verificar se o usuário é admin para decidir quais conexões carregar
+        let query = supabase
           .from('conexoes')
           .select('*')
-          .eq('type', 'whatsapp')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
+          .eq('type', 'whatsapp');
+
+        // Se não for admin, filtrar apenas as conexões do usuário
+        if (!isAdmin) {
+          query = query.eq('user_id', user.id);
+        }
+
+        const { data: conexoes, error } = await query.order('created_at', { ascending: false });
 
         if (!mounted) {
           clearTimeout(timeoutId);
@@ -257,7 +263,7 @@ const Dashboard = () => {
     return () => {
       mounted = false;
     };
-  }, [user, toast]);
+  }, [user, isAdmin, toast]);
 
   const handleCreateConnection = () => {
     setShowConnectionNameModal(true);
