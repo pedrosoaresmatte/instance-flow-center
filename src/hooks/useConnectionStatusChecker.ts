@@ -20,7 +20,7 @@ export const useConnectionStatusChecker = ({
   onStatusUpdate,
   onConnectionRestored,
   isEnabled = true,
-  intervalMs = 60000 // Aumentar para 1 minuto para reduzir carga
+  intervalMs = 300000 // 5 minutos (300000ms)
 }: UseConnectionStatusCheckerProps) => {
   const [isChecking, setIsChecking] = useState(false);
   const [lastCheckTime, setLastCheckTime] = useState<Date | null>(null);
@@ -159,16 +159,16 @@ export const useConnectionStatusChecker = ({
     }
   }, [connections, isEnabled, onStatusUpdate, onConnectionRestored, toast]);
 
-  // Configurar intervalo simplificado
+  // Configurar intervalo para 5 minutos
   useEffect(() => {
     if (!isEnabled || connections.length === 0) return;
 
-    // Verificação inicial após 10 segundos (reduzido de 5s)
+    // Verificação inicial após 30 segundos
     const initialTimer = setTimeout(() => {
       checkConnectionStatus();
-    }, 10000);
+    }, 30000);
 
-    // Verificação periódica
+    // Verificação periódica a cada 5 minutos
     const interval = setInterval(() => {
       checkConnectionStatus();
     }, intervalMs);
@@ -182,12 +182,12 @@ export const useConnectionStatusChecker = ({
     };
   }, [checkConnectionStatus, isEnabled, intervalMs]);
 
-  // Pausar verificações quando página não está visível (simplificado)
+  // Pausar verificações quando página não está visível
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden && isEnabled) {
-        // Verificar após 2 segundos quando página voltar a ficar visível
-        timeoutRef.current = setTimeout(() => checkConnectionStatus(), 2000);
+        // Verificar após 5 segundos quando página voltar a ficar visível
+        timeoutRef.current = setTimeout(() => checkConnectionStatus(), 5000);
       }
     };
 
