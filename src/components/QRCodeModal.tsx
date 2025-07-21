@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -89,15 +88,15 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
             const data = await response.json();
             console.log('Resposta da verificação:', data);
             
-            // Validação mais rigorosa - verificar se retornou os dados válidos do perfil conectado
-            if (data && data.profilename && data.contato && data.fotodoperfil) {
+            // Validação simplificada - verificar apenas se retornou contato válido
+            if (data && data.contato) {
               console.log(`Conexão estabelecida com sucesso para a instância: ${connection.name}!`);
               
               // Parar o polling imediatamente
               setIsPolling(false);
               setIsConnected(true);
               
-              // Processar a foto do perfil
+              // Processar a foto do perfil se disponível
               let profileImageBase64 = null;
               if (data.fotodoperfil) {
                 try {
@@ -118,17 +117,18 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
               
               // Preparar dados do perfil para salvar
               const profileData = {
-                profilename: data.profilename,
+                profilename: data.profilename || "Usuário WhatsApp", // Valor padrão se vazio
                 contato: data.contato,
-                fotodoperfil: data.fotodoperfil,
+                fotodoperfil: data.fotodoperfil || null, // Opcional
                 profileImageBase64: profileImageBase64
               };
               
               onConnectionSuccess(instanceId, data.contato, profileData);
               
+              const displayName = data.profilename || "Usuário WhatsApp";
               toast({
                 title: "WhatsApp Conectado!",
-                description: `Conectado com sucesso para ${data.profilename}`,
+                description: `Conectado com sucesso para ${displayName}`,
               });
               
               // Fechar o modal automaticamente após 2 segundos
@@ -136,7 +136,7 @@ const QRCodeModal = ({ isOpen, onClose, instanceId, connection, onConnectionSucc
                 handleCancel();
               }, 2000);
             } else {
-              console.log(`Instância ${connection.name} ainda não conectada - dados incompletos ou vazios`);
+              console.log(`Instância ${connection.name} ainda não conectada - contato não disponível`);
             }
           } else if (response.status === 404) {
             console.log(`Instância ${connection.name} não encontrada ou não conectada`);
