@@ -90,14 +90,28 @@ const Dashboard = () => {
   // Hook de verificação de status (pausado quando modals estão abertos)
   const { isChecking, lastCheckTime, checkNow } = useConnectionStatusChecker({
     connections: connections,
-    onStatusUpdate: (connectionId, newStatus) => {
+    onStatusUpdate: async (connectionId, newStatus) => {
       console.log('Status atualizado:', connectionId, newStatus);
+      
+      // Buscar dados atualizados da conexão no banco
+      const { data: updatedConnection } = await supabase
+        .from('conexoes')
+        .select('*')
+        .eq('id', connectionId)
+        .single();
+      
       setConnections(prev =>
         prev.map(conn =>
           conn.id === connectionId
             ? { 
                 ...conn, 
                 status: newStatus,
+                ...(updatedConnection && {
+                  whatsapp_profile_name: updatedConnection.whatsapp_profile_name,
+                  whatsapp_profile_picture_url: updatedConnection.whatsapp_profile_picture_url,
+                  whatsapp_contact: updatedConnection.whatsapp_contact,
+                  phone: updatedConnection.whatsapp_contact
+                }),
                 ...(newStatus === 'disconnected' && {
                   phone: undefined,
                   whatsapp_profile_name: undefined,
