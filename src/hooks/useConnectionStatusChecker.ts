@@ -64,7 +64,7 @@ export const useConnectionStatusChecker = ({
               const timeoutId = setTimeout(() => controller.abort(), 10000); // Timeout de 10s
 
               const response = await fetch(
-                `https://webhook.abbadigital.com.br/webhook/pega-dados-da-conexao-matte?connectionName=${encodeURIComponent(connection.name)}`,
+                `https://webhook.abbadigital.com.br/webhook/verifica-status-matte?connectionName=${encodeURIComponent(connection.name)}`,
                 {
                   method: 'GET',
                   headers: { 'Content-Type': 'application/json' },
@@ -75,63 +75,55 @@ export const useConnectionStatusChecker = ({
               clearTimeout(timeoutId);
 
               if (response.ok) {
-                const data = await response.json();
-                console.log(`Status ${connection.name}:`, data);
+                const responseText = await response.text();
+                console.log(`Status ${connection.name}:`, responseText);
                 
                 let newStatus: 'connected' | 'disconnected' | 'loading';
                 
-                if (data.status === 'open' && data.contato) {
+                if (responseText.toLowerCase() === 'open') {
                   newStatus = 'connected';
-                } else if (data.status === 'close') {
+                } else if (responseText.toLowerCase() === 'close') {
                   newStatus = 'disconnected';
                 } else {
                   newStatus = 'loading';
                 }
 
                 const currentMappedStatus = connection.status === 'qr_code' ? 'loading' : connection.status;
-                
-                // Atualizar sempre os dados do perfil, independente de mudança de status
-                const dbStatus = newStatus === 'connected' ? 'active' : 
-                               newStatus === 'disconnected' ? 'inactive' : 'connecting';
-                
-                const updateData: any = {
-                  status: dbStatus,
-                  whatsapp_profile_name: data.profilename || 'Usuário WhatsApp',
-                  whatsapp_contact: data.contato || null,
-                  whatsapp_profile_picture_url: data.fotodoperfil || null,
-                  whatsapp_connected_at: data.status === 'open' && data.contato ? new Date().toISOString() : null,
-                  updated_at: new Date().toISOString(),
-                  configuration: {
-                    connection_status: newStatus === 'connected' ? 'connected' : 'disconnected',
-                    evolution_api_key: null,
-                    evolution_instance_name: connection.name,
-                  }
-                };
-                
-                const { error } = await supabase
-                  .from('conexoes')
-                  .update(updateData)
-                  .eq('id', connection.id);
+                if (currentMappedStatus !== newStatus) {
+                  console.log(`Status mudou: ${connection.name} ${currentMappedStatus} -> ${newStatus}`);
+                  
+                  // Atualizar apenas o status no banco
+                  const dbStatus = newStatus === 'connected' ? 'active' : 
+                                 newStatus === 'disconnected' ? 'inactive' : 'connecting';
+                  
+                  const { error } = await supabase
+                    .from('conexoes')
+                    .update({ 
+                      status: dbStatus,
+                      updated_at: new Date().toISOString()
+                    })
+                    .eq('id', connection.id);
 
-                if (!error) {
-                  onStatusUpdate(connection.id, newStatus);
-                  
-                  if (currentMappedStatus === 'disconnected' && newStatus === 'connected' && onConnectionRestored) {
-                    onConnectionRestored(connection.id);
-                  }
-                  
-                  // Toast apenas para mudanças importantes
-                  if (currentMappedStatus === 'connected' && newStatus === 'disconnected') {
-                    toast({
-                      title: "Conexão perdida",
-                      description: `${connection.name} desconectada.`,
-                      variant: "destructive",
-                    });
-                  } else if (currentMappedStatus === 'disconnected' && newStatus === 'connected') {
-                    toast({
-                      title: "Reconectado",
-                      description: `${connection.name} restabelecida.`,
-                    });
+                  if (!error) {
+                    onStatusUpdate(connection.id, newStatus);
+                    
+                    if (currentMappedStatus === 'disconnected' && newStatus === 'connected' && onConnectionRestored) {
+                      onConnectionRestored(connection.id);
+                    }
+                    
+                    // Toast apenas para mudanças importantes
+                    if (currentMappedStatus === 'connected' && newStatus === 'disconnected') {
+                      toast({
+                        title: "Conexão perdida",
+                        description: `${connection.name} desconectada.`,
+                        variant: "destructive",
+                      });
+                    } else if (currentMappedStatus === 'disconnected' && newStatus === 'connected') {
+                      toast({
+                        title: "Reconectado",
+                        description: `${connection.name} restabelecida.`,
+                      });
+                    }
                   }
                 }
               }
