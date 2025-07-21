@@ -88,8 +88,9 @@ const ImportInstanceModal = ({ users, onSuccess }: ImportInstanceModalProps) => 
       console.log("Dados da instância:", data);
 
       // Determinar status baseado nos dados retornados
-      const status = data.contato ? 'active' : 'inactive';
-      const connectionStatus = data.contato ? 'connected' : 'disconnected';
+      const isConnected = data.status === 'open' && data.contato;
+      const status = isConnected ? 'active' : 'inactive';
+      const connectionStatus = isConnected ? 'connected' : 'disconnected';
 
       // Salvar instância no banco de dados com os dados importados
       const { error: insertError } = await supabase
@@ -103,7 +104,7 @@ const ImportInstanceModal = ({ users, onSuccess }: ImportInstanceModalProps) => 
           whatsapp_profile_name: data.profilename || 'Usuário WhatsApp',
           whatsapp_contact: data.contato || null,
           whatsapp_profile_picture_url: data.fotodoperfil || null,
-          whatsapp_connected_at: data.contato ? new Date().toISOString() : null,
+          whatsapp_connected_at: isConnected ? new Date().toISOString() : null,
           configuration: {
             connection_status: connectionStatus,
             evolution_api_key: null,
