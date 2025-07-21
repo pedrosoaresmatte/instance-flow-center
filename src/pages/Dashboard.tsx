@@ -498,7 +498,44 @@ const Dashboard = () => {
         throw error;
       }
 
+      // Remover imediatamente da lista local
       setConnections(prev => prev.filter(conn => conn.id !== connectionId));
+      
+      // Forçar recarregamento após um pequeno delay para garantir sincronização
+      setTimeout(async () => {
+        try {
+          let query = supabase
+            .from('conexoes')
+            .select('*')
+            .eq('type', 'whatsapp');
+
+          if (!isAdmin && user) {
+            query = query.eq('user_id', user.id);
+          }
+
+          const { data: conexoes } = await query.order('created_at', { ascending: false });
+          
+          if (conexoes) {
+            const mappedConnections: WhatsAppConnection[] = conexoes.map(conexao => ({
+              id: conexao.id,
+              name: conexao.name,
+              status: conexao.status === 'active' ? 'connected' : 
+                     conexao.status === 'connecting' ? 'qr_code' : 'disconnected',
+              phone: conexao.whatsapp_contact,
+              createdAt: conexao.created_at,
+              lastActivity: conexao.whatsapp_connected_at,
+              whatsapp_profile_name: conexao.whatsapp_profile_name,
+              whatsapp_profile_picture_url: conexao.whatsapp_profile_picture_url,
+              whatsapp_profile_picture_data: conexao.whatsapp_profile_picture_data,
+            })) || [];
+            
+            setConnections(mappedConnections);
+            console.log('Lista de conexões sincronizada após exclusão:', mappedConnections.length);
+          }
+        } catch (refreshError) {
+          console.error('Erro ao sincronizar lista após exclusão:', refreshError);
+        }
+      }, 1000);
       
       toast({
         title: "Excluído",

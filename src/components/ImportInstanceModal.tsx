@@ -178,8 +178,8 @@ const ImportInstanceModal = ({ users, onSuccess }: ImportInstanceModalProps) => 
               </SelectTrigger>
               <SelectContent>
                 {activeUsers.map((user) => (
-                  <SelectItem key={user.id} value={user.user_id}>
-                    {user.display_name}
+                  <SelectItem key={user.user_id} value={user.user_id}>
+                    {user.display_name || 'Usuário sem nome'}
                   </SelectItem>
                 ))}
               </SelectContent>
