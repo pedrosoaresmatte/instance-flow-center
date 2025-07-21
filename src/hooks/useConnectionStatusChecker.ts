@@ -78,30 +78,44 @@ export const useConnectionStatusChecker = ({
                 const responseText = await response.text();
                 console.log(`Status ${connection.name}:`, responseText);
                 
-                let newStatus: 'connected' | 'disconnected' | 'loading';
-                
-                if (responseText.toLowerCase() === 'open') {
-                  newStatus = 'connected';
-                } else if (responseText.toLowerCase() === 'close') {
-                  newStatus = 'disconnected';
-                } else {
-                  newStatus = 'loading';
-                }
-
-                const currentMappedStatus = connection.status === 'qr_code' ? 'loading' : connection.status;
-                if (currentMappedStatus !== newStatus) {
-                  console.log(`Status mudou: ${connection.name} ${currentMappedStatus} -> ${newStatus}`);
+                try {
+                  const responseData = JSON.parse(responseText);
                   
-                  // Atualizar apenas o status no banco
+                  let newStatus: 'connected' | 'disconnected' | 'loading';
+                  
+                  if (responseData.status?.toLowerCase() === 'open') {
+                    newStatus = 'connected';
+                  } else if (responseData.status?.toLowerCase() === 'close') {
+                    newStatus = 'disconnected';
+                  } else {
+                    newStatus = 'loading';
+                  }
+
+                  const currentMappedStatus = connection.status === 'qr_code' ? 'loading' : connection.status;
+                  
+                  // Sempre atualizar os dados do perfil, independente se o status mudou
                   const dbStatus = newStatus === 'connected' ? 'active' : 
                                  newStatus === 'disconnected' ? 'inactive' : 'connecting';
                   
+                  const updateData: any = {
+                    status: dbStatus,
+                    updated_at: new Date().toISOString()
+                  };
+
+                  // Atualizar dados do perfil se disponíveis
+                  if (responseData.profilename) {
+                    updateData.whatsapp_profile_name = responseData.profilename;
+                  }
+                  if (responseData.contato) {
+                    updateData.whatsapp_contact = responseData.contato;
+                  }
+                  if (responseData.fotodoperfil) {
+                    updateData.whatsapp_profile_picture_url = responseData.fotodoperfil;
+                  }
+                  
                   const { error } = await supabase
                     .from('conexoes')
-                    .update({ 
-                      status: dbStatus,
-                      updated_at: new Date().toISOString()
-                    })
+                    .update(updateData)
                     .eq('id', connection.id);
 
                   if (!error) {
@@ -125,6 +139,8 @@ export const useConnectionStatusChecker = ({
                       });
                     }
                   }
+                } catch (parseError) {
+                  console.warn(`Erro ao fazer parse do JSON de ${connection.name}:`, parseError);
                 }
               }
             } catch (error) {
