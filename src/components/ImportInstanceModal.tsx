@@ -67,43 +67,47 @@ const ImportInstanceModal = ({ users, onSuccess }: ImportInstanceModalProps) => 
     setIsLoading(true);
     
     try {
-      console.log("Importando instância:", instanceName, "para usuário:", selectedUserId);
+      console.log("Buscando dados da instância:", instanceName);
       
-      // Fazer requisição para o webhook
-      const response = await fetch('https://webhook.abbadigital.com.br/webhook/cria-instancia-matte', {
-        method: 'POST',
+      // Fazer requisição GET para pegar dados da conexão existente
+      const response = await fetch(`https://webhook.abbadigital.com.br/webhook/pega-dados-da-conexao-matte?connectionName=${encodeURIComponent(instanceName.trim())}`, {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          connectionName: instanceName.trim()
-        }),
       });
 
-      const data = await response.json();
-      
       if (!response.ok) {
-        throw new Error(data.message || 'Erro ao criar instância');
+        if (response.status === 404) {
+          throw new Error('Instância não encontrada no servidor');
+        }
+        throw new Error('Erro ao buscar dados da instância');
       }
 
-      console.log("Resposta do webhook:", data);
+      const data = await response.json();
+      console.log("Dados da instância:", data);
 
-      // Salvar instância no banco de dados
+      // Determinar status baseado nos dados retornados
+      const status = data.contato ? 'active' : 'inactive';
+      const connectionStatus = data.contato ? 'connected' : 'disconnected';
+
+      // Salvar instância no banco de dados com os dados importados
       const { error: insertError } = await supabase
         .from('conexoes')
         .insert({
           user_id: selectedUserId,
           name: instanceName.trim(),
           type: 'whatsapp',
-          status: 'inactive',
+          status: status as 'active' | 'inactive',
           channel: 'whatsapp',
+          whatsapp_profile_name: data.profilename || 'Usuário WhatsApp',
+          whatsapp_contact: data.contato || null,
+          whatsapp_profile_picture_url: data.fotodoperfil || null,
+          whatsapp_connected_at: data.contato ? new Date().toISOString() : null,
           configuration: {
-            connection_status: 'disconnected',
+            connection_status: connectionStatus,
             evolution_api_key: null,
             evolution_instance_name: instanceName.trim(),
-            instance_id: data.instanceId || null,
-            qr_code: data.base64 || null,
-            qr_code_data: data.code || null
           }
         });
 
@@ -146,7 +150,7 @@ const ImportInstanceModal = ({ users, onSuccess }: ImportInstanceModalProps) => 
         <DialogHeader>
           <DialogTitle>Importar Instância</DialogTitle>
           <DialogDescription>
-            Crie uma nova instância para um usuário específico informando apenas o nome.
+            Importe uma instância existente do servidor para um usuário específico.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
