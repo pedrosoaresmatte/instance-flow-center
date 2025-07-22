@@ -87,7 +87,7 @@ const Dashboard = () => {
     }
   }, []);
 
-  // Hook de verificação de status (pausado quando modals estão abertos)
+  // Hook de verificação de status (desativado)
   const { isChecking, lastCheckTime, checkNow } = useConnectionStatusChecker({
     connections: connections,
     onStatusUpdate: async (connectionId, newStatus) => {
@@ -123,7 +123,7 @@ const Dashboard = () => {
       );
     },
     onConnectionRestored: reloadConnectionData,
-    isEnabled: !showQRModal && !showConnectionNameModal && !isLoading,
+    isEnabled: false, // Verificações desativadas
     intervalMs: 300000 // 5 minutos
   });
 
