@@ -15,7 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import QRCodeModal from "@/components/QRCodeModal";
 import InstanceCard from "@/components/InstanceCard";
 import ConnectionNameModal from "@/components/ConnectionNameModal";
-import { useConnectionStatusChecker } from "@/hooks/useConnectionStatusChecker";
+
 
 interface WhatsAppConnection {
   id: string;
@@ -87,45 +87,65 @@ const Dashboard = () => {
     }
   }, []);
 
-  // Hook de verificação de status (desativado)
-  const { isChecking, lastCheckTime, checkNow } = useConnectionStatusChecker({
-    connections: connections,
-    onStatusUpdate: async (connectionId, newStatus) => {
-      console.log('Status atualizado:', connectionId, newStatus);
-      
-      // Buscar dados atualizados da conexão no banco
-      const { data: updatedConnection } = await supabase
-        .from('conexoes')
-        .select('*')
-        .eq('id', connectionId)
-        .single();
-      
-      setConnections(prev =>
-        prev.map(conn =>
-          conn.id === connectionId
-            ? { 
-                ...conn, 
-                status: newStatus,
-                ...(updatedConnection && {
-                  whatsapp_profile_name: updatedConnection.whatsapp_profile_name,
-                  whatsapp_profile_picture_url: updatedConnection.whatsapp_profile_picture_url,
-                  whatsapp_contact: updatedConnection.whatsapp_contact,
-                  phone: updatedConnection.whatsapp_contact
-                }),
-                ...(newStatus === 'disconnected' && {
-                  phone: undefined,
-                  whatsapp_profile_name: undefined,
-                  whatsapp_profile_picture_url: undefined
-                })
-              }
-            : conn
-        )
-      );
-    },
-    onConnectionRestored: reloadConnectionData,
-    isEnabled: false, // Verificações desativadas
-    intervalMs: 300000 // 5 minutos
-  });
+  // Função de verificação manual de status
+  const checkConnectionsStatus = useCallback(async () => {
+    if (connections.length === 0) return;
+    
+    console.log('Verificando status manualmente...');
+    
+    for (const connection of connections) {
+      try {
+        const response = await fetch(`https://webhook.abbadigital.com.br/webhook/status-matte?connectionName=${encodeURIComponent(connection.name)}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const newStatus = data.connected ? 'connected' : 'disconnected';
+          
+          if (connection.status !== newStatus) {
+            // Atualizar no banco
+            await supabase
+              .from('conexoes')
+              .update({ 
+                status: newStatus === 'connected' ? 'active' : 'disconnected',
+                whatsapp_contact: data.connected ? data.phone : null,
+                whatsapp_profile_name: data.connected ? data.profileName : null,
+                whatsapp_profile_picture_url: data.connected ? data.profilePicture : null,
+                whatsapp_connected_at: data.connected ? new Date().toISOString() : null
+              })
+              .eq('id', connection.id);
+
+            // Atualizar estado local
+            setConnections(prev =>
+              prev.map(conn =>
+                conn.id === connection.id
+                  ? { 
+                      ...conn, 
+                      status: newStatus,
+                      phone: data.connected ? data.phone : undefined,
+                      whatsapp_profile_name: data.connected ? data.profileName : undefined,
+                      whatsapp_profile_picture_url: data.connected ? data.profilePicture : undefined
+                    }
+                  : conn
+              )
+            );
+
+            toast({
+              title: newStatus === 'connected' ? "Conexão restaurada" : "Conexão perdida",
+              description: `${connection.name} está ${newStatus === 'connected' ? 'conectada' : 'desconectada'}`,
+              variant: newStatus === 'connected' ? "default" : "destructive",
+            });
+          }
+        }
+      } catch (error) {
+        console.error(`Erro ao verificar status de ${connection.name}:`, error);
+      }
+    }
+  }, [connections, toast]);
 
   // Verificar autenticação (simplificado)
   useEffect(() => {
@@ -627,20 +647,6 @@ const Dashboard = () => {
           </div>
           
           <div className="flex items-center space-x-4">
-            {/* Status da verificação automática */}
-            <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-              {isChecking ? (
-                <>
-                  <RefreshCw className="h-3 w-3 animate-spin" />
-                  <span>Verificando...</span>
-                </>
-              ) : lastCheckTime ? (
-                <>
-                  <Wifi className="h-3 w-3" />
-                  <span>Última verificação: {lastCheckTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-                </>
-              ) : null}
-            </div>
             
             <div className="flex items-center space-x-2 text-sm text-muted-foreground">
               <User className="h-4 w-4" />
@@ -679,8 +685,8 @@ const Dashboard = () => {
           </div>
           
           <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm" onClick={checkNow} disabled={isChecking}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${isChecking ? 'animate-spin' : ''}`} />
+            <Button variant="outline" size="sm" onClick={checkConnectionsStatus}>
+              <RefreshCw className="h-4 w-4 mr-2" />
               Verificar Agora
             </Button>
             
